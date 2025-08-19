@@ -1,0 +1,895 @@
+/**
+ * File: assets/frontend/fahrplanportal.css
+ * Fahrplanportal Frontend CSS
+ * Externe CSS-Datei für das Fahrplanportal
+ * ✅ VERBESSERT: Mobile Download-Button Layout
+ */
+
+:root {
+    --fahrplanportal-primary: #007BC1;
+    --fahrplanportal-secondary: #6c757d;
+    --fahrplanportal-success: #198754;
+    --fahrplanportal-danger: #dc3545;
+    --fahrplanportal-light: #f8f9fa;
+    --fahrplanportal-border: #dee2e6;
+}
+
+.fahrplanportal-frontend {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.fahrplanportal-filters {
+    background: var(--fahrplanportal-light);
+    border: 1px solid var(--fahrplanportal-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.fahrplanportal-filters .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.fahrplanportal-filters .form-select,
+.fahrplanportal-filters .form-control {
+    border: 2px solid var(--fahrplanportal-border);
+    border-radius: 6px;
+    padding: 0 1rem;
+    transition: all 0.2s ease;
+}
+
+.fahrplanportal-filters .form-select:focus,
+.fahrplanportal-filters .form-control:focus {
+    border-color: var(--fahrplanportal-primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 124, 186, 0.25);
+}
+
+.fahrplanportal-reset {
+    background-color: var(--fahrplanportal-danger);
+    border-color: var(--fahrplanportal-danger);
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.fahrplanportal-reset:hover {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+    transform: translateY(-1px);
+}
+
+.fahrplanportal-empty-state,
+.fahrplanportal-no-results {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: white;
+    border: 2px dashed var(--fahrplanportal-border);
+    border-radius: 8px;
+}
+
+.empty-state-icon {
+    color: var(--fahrplanportal-secondary);
+    margin-bottom: 1rem;
+}
+
+.empty-state-icon svg {
+    opacity: 0.7;
+}
+
+/* Fahrplan Items */
+.fahrplanportal-item.card {
+    transition: all 0.2s ease;
+    background: #f9f9f9;
+    border-left: 4px solid var(--e-global-color-primary);
+    border-radius: 0 !important;
+    margin-bottom: 15px;
+    text-decoration: none !important;
+}
+
+.fahrplanportal-item.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.fahrplanportal-item .card-body {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.fahrplanportal-item-content {
+    flex: 1;
+}
+
+/* ✅ NEU: Mobile Bottom Row (standardmäßig versteckt) */
+.fahrplanportal-mobile-bottom {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    gap: 15px;
+}
+
+/* Top Row Layout */
+.fahrplanportal-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.fahrplanportal-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fahrplan-line-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 0.35em 0.65em;
+}
+
+.fahrplanportal-validity {
+    text-align: center;
+    color: var(--fahrplanportal-secondary);
+    font-weight: 500;
+    font-size: 0.85rem;
+    flex: 1;
+    min-width: 200px;
+}
+
+.fahrplanportal-region-desktop {
+    text-align: right;
+    color: var(--fahrplanportal-secondary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Mobile Region - nur auf Mobile sichtbar */
+.fahrplanportal-region-mobile {
+    color: var(--fahrplanportal-secondary);
+    font-weight: 500;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.fahrplanportal-title p {
+    font-weight: bold;
+    margin: 0 0 4px 0;
+    color: #212529;
+    font-size: 1.3rem;
+    line-height: 1.3;
+}
+
+.fahrplanportal-description p {
+    color: var(--fahrplanportal-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Download Button */
+.fahrplanportal-download,
+.fahrplanportal-download-mobile {
+    flex-shrink: 0;
+}
+
+.fahrplan-download-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--fahrplanportal-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    color: var(--fahrplanportal-primary);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.fahrplanportal-item:hover .fahrplan-download-btn {
+    background-color: var(--fahrplanportal-primary);
+    color: white;
+    transform: scale(1.1);
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--fahrplanportal-border);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.results-header h5 {
+    margin: 0;
+    color: #212529;
+}
+
+.badge.bg-primary {
+    background-color: var(--fahrplanportal-primary) !important;
+}
+
+.autocomplete-wrapper {
+    position: relative;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid var(--fahrplanportal-border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1050;
+    display: none;
+}
+
+.autocomplete-dropdown.show {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover {
+    background-color: var(--fahrplanportal-light);
+}
+
+.autocomplete-text {
+    font-weight: 600;
+    color: #212529;
+    font-size: 0.95rem;
+}
+
+.autocomplete-context {
+    font-size: 0.8rem;
+    color: var(--fahrplanportal-secondary);
+    font-style: italic;
+}
+
+.autocomplete-loading {
+    padding: 1rem;
+    text-align: center;
+    color: var(--fahrplanportal-secondary);
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .fahrplanportal-filters {
+        padding: 1rem;
+    }
+    
+    /* ✅ VERBESSERT: Mobile Card Layout */
+    .fahrplanportal-item .card-body {
+        flex-direction: column;
+        gap: 0;
+        align-items: stretch;
+    }
+    
+    /* ✅ NEU: Mobile Bottom Row anzeigen */
+    .fahrplanportal-mobile-bottom {
+        display: flex !important;
+    }
+    
+    /* ✅ VERBESSERT: Mobile Layout für Top Row */
+    .fahrplanportal-top-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    /* Badges bleiben linksbündig */
+    .fahrplanportal-badges {
+        flex: 0 0 auto;
+        order: 1;
+    }
+    
+    /* Validity wird rechtsbündig und nimmt verfügbaren Platz */
+    .fahrplanportal-validity {
+        flex: 1 1 auto;
+        text-align: right !important;
+        min-width: auto;
+        order: 2;
+    }
+
+    .fahrplanportal-title p {
+        font-weight: bold;
+        margin: 0 0 2px 0;
+        color: #212529;
+        font-size: 1.1rem;
+        line-height: 1.3;
+    }
+    
+    /* ✅ GEÄNDERT: Desktop Region auf Mobile verstecken */
+    .fahrplanportal-region-desktop {
+        display: none !important;
+    }
+    
+    /* ✅ NEU: Desktop Download Button auf Mobile verstecken */
+    .fahrplanportal-download-desktop {
+        display: none !important;
+    }
+}
+
+/* Desktop - Mobile Elemente ausblenden */
+@media (min-width: 769px) {
+    .fahrplanportal-region-mobile {
+        display: none !important;
+    }
+    
+    .fahrplanportal-mobile-bottom {
+        display: none !important;
+    }
+    
+    .fahrplanportal-download-mobile {
+        display: none !important;
+    }
+    
+    .fahrplanportal-region-desktop {
+        display: flex !important;
+    }
+}
+
+
+
+.fahrplanportal-last-update {
+    text-align: center;
+    margin: 15px 0;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #495057;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.fahrplanportal-last-update:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.fahrplanportal-last-update::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.5s ease;
+}
+
+.fahrplanportal-last-update:hover::before {
+    left: 100%;
+}
+
+/* Last-Update Content Layout */
+.fahrplanportal-last-update div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+}
+
+.fahrplanportal-last-update .fas {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.fahrplanportal-last-update span {
+    font-weight: 500;
+}
+
+/* ========================================
+   STATUS INDICATORS
+   ======================================== */
+
+/* Fresh Data (< 7 days) */
+.fahrplanportal-last-update.fresh {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+.fahrplanportal-last-update.fresh .fas {
+    color: #28a745;
+}
+
+/* Aging Data (7-30 days) */
+.fahrplanportal-last-update.aging {
+    border-left: 4px solid #ffc107;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    color: #856404;
+}
+
+.fahrplanportal-last-update.aging .fas {
+    color: #ffc107;
+}
+
+/* Old Data (> 30 days) */
+.fahrplanportal-last-update.old {
+    border-left: 4px solid #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+}
+
+.fahrplanportal-last-update.old .fas {
+    color: #dc3545;
+}
+
+/* ========================================
+   LIVE/STAGING BADGES
+   ======================================== */
+
+.fahrplanportal-last-update span[style*="background: #28a745"] {
+    /* Live Badge */
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+    color: white !important;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3) !important;
+    animation: pulse-live 2s infinite !important;
+}
+
+.fahrplanportal-last-update span[style*="background: #ffc107"] {
+    /* Staging Badge */
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+    color: #856404 !important;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3) !important;
+}
+
+@keyframes pulse-live {
+    0%, 100% {
+        box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+    }
+    50% {
+        box-shadow: 0 2px 8px rgba(40, 167, 69, 0.5);
+    }
+}
+
+/* ========================================
+   SEARCH FILTER ENHANCEMENTS
+   ======================================== */
+
+/* Live/Staging Indicators in Search Labels */
+.form-label .text-success {
+    color: #28a745 !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 2px rgba(40, 167, 69, 0.2);
+}
+
+.form-label .text-warning {
+    color: #fd7e14 !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 2px rgba(255, 193, 7, 0.2);
+}
+
+/* Enhanced Status Icons */
+.form-label .text-success::before {
+    content: '🟢';
+    margin-right: 4px;
+    font-size: 10px;
+}
+
+.form-label .text-warning::before {
+    content: '🟡';
+    margin-right: 4px;
+    font-size: 10px;
+}
+
+/* ========================================
+   EMPTY STATE ENHANCEMENTS
+   ======================================== */
+
+.fahrplanportal-empty-state .text-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border: 1px solid #28a745;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-weight: 500;
+}
+
+.fahrplanportal-empty-state .text-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-weight: 500;
+}
+
+/* ========================================
+   MOBILE OPTIMIZATIONS
+   ======================================== */
+
+@media (max-width: 768px) {
+    .fahrplanportal-last-update {
+        font-size: 12px;
+        padding: 10px 15px;
+        margin: 10px 0;
+    }
+    
+    .fahrplanportal-last-update div {
+        flex-direction: column;
+        gap: 4px !important;
+    }
+    
+    .fahrplanportal-last-update span {
+        display: block;
+        margin: 2px 0 !important;
+    }
+    
+    /* Mobile Badge Adjustments */
+    .fahrplanportal-last-update span[style*="background: #28a745"],
+    .fahrplanportal-last-update span[style*="background: #ffc107"] {
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+        margin-top: 4px !important;
+    }
+    
+    /* Mobile Search Label Adjustments */
+    .form-label .text-success,
+    .form-label .text-warning {
+        display: block;
+        margin-top: 4px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .fahrplanportal-last-update {
+        font-size: 11px;
+        padding: 8px 12px;
+        border-radius: 6px;
+    }
+    
+    .fahrplanportal-last-update .fas {
+        font-size: 10px;
+    }
+    
+    .fahrplanportal-empty-state .text-success,
+    .fahrplanportal-empty-state .text-warning {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+}
+
+/* ========================================
+   ACCESSIBILITY IMPROVEMENTS
+   ======================================== */
+
+.fahrplanportal-last-update:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+.fahrplanportal-last-update[role="status"] {
+    /* Screen reader announcement */
+    position: relative;
+}
+
+.fahrplanportal-last-update[aria-live="polite"] {
+    /* Dynamic updates announcement */
+    position: relative;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .fahrplanportal-last-update {
+        border: 2px solid;
+        background: ButtonFace;
+        color: ButtonText;
+    }
+    
+    .fahrplanportal-last-update.fresh {
+        border-color: green;
+    }
+    
+    .fahrplanportal-last-update.aging {
+        border-color: orange;
+    }
+    
+    .fahrplanportal-last-update.old {
+        border-color: red;
+    }
+    
+    .fahrplanportal-last-update span[style*="background"] {
+        background: Highlight !important;
+        color: HighlightText !important;
+        border: 1px solid ButtonText !important;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .fahrplanportal-last-update {
+        transition: none;
+    }
+    
+    .fahrplanportal-last-update:hover {
+        transform: none;
+    }
+    
+    .fahrplanportal-last-update::before {
+        display: none;
+    }
+    
+    .fahrplanportal-last-update span[style*="background: #28a745"] {
+        animation: none !important;
+    }
+}
+
+/* ========================================
+   DARK MODE SUPPORT
+   ======================================== */
+
+@media (prefers-color-scheme: dark) {
+    .fahrplanportal-last-update {
+        background: linear-gradient(135deg, #343a40 0%, #495057 100%);
+        border-color: #6c757d;
+        color: #f8f9fa;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .fahrplanportal-last-update .fas {
+        color: #adb5bd;
+    }
+    
+    /* Dark Mode Status Colors */
+    .fahrplanportal-last-update.fresh {
+        background: linear-gradient(135deg, #1e4d2b 0%, #2d5a3d 100%);
+        color: #c3e6cb;
+        border-left-color: #28a745;
+    }
+    
+    .fahrplanportal-last-update.aging {
+        background: linear-gradient(135deg, #4d3800 0%, #5a4500 100%);
+        color: #ffeaa7;
+        border-left-color: #ffc107;
+    }
+    
+    .fahrplanportal-last-update.old {
+        background: linear-gradient(135deg, #4d1017 0%, #5a1a22 100%);
+        color: #f5c6cb;
+        border-left-color: #dc3545;
+    }
+    
+    /* Dark Mode Badges */
+    .fahrplanportal-last-update span[style*="background: #28a745"] {
+        background: linear-gradient(135deg, #198754 0%, #157347 100%) !important;
+        box-shadow: 0 2px 4px rgba(25, 135, 84, 0.4) !important;
+    }
+    
+    .fahrplanportal-last-update span[style*="background: #ffc107"] {
+        background: linear-gradient(135deg, #fd7e14 0%, #e55e0a 100%) !important;
+        color: #000 !important;
+        box-shadow: 0 2px 4px rgba(253, 126, 20, 0.4) !important;
+    }
+    
+    /* Dark Mode Empty State */
+    .fahrplanportal-empty-state .text-success {
+        background: linear-gradient(135deg, #1e4d2b 0%, #2d5a3d 100%);
+        border-color: #28a745;
+        color: #c3e6cb;
+    }
+    
+    .fahrplanportal-empty-state .text-warning {
+        background: linear-gradient(135deg, #4d3800 0%, #5a4500 100%);
+        border-color: #ffc107;
+        color: #ffeaa7;
+    }
+}
+
+/* ========================================
+   PRINT STYLES
+   ======================================== */
+
+@media print {
+    .fahrplanportal-last-update {
+        background: white !important;
+        color: black !important;
+        border: 1px solid black !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+    
+    .fahrplanportal-last-update span[style*="background"] {
+        background: white !important;
+        color: black !important;
+        border: 1px solid black !important;
+        box-shadow: none !important;
+    }
+    
+    .fahrplanportal-last-update::before {
+        display: none !important;
+    }
+}
+
+/* ========================================
+   ANIMATION ENHANCEMENTS
+   ======================================== */
+
+/* Subtle entry animation for last-update */
+.fahrplanportal-last-update {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Status change animation */
+.fahrplanportal-last-update.status-changed {
+    animation: statusChange 0.6s ease-out;
+}
+
+@keyframes statusChange {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.02);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+.fahrplanportal-hidden {
+    display: none !important;
+}
+
+.fahrplanportal-fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+.fahrplanportal-slide-up {
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   COMPONENT SPECIFIC FIXES
+   ======================================== */
+
+/* Ensure compatibility with Bootstrap classes */
+.fahrplanportal-frontend .text-success {
+    color: #28a745 !important;
+}
+
+.fahrplanportal-frontend .text-warning {
+    color: #fd7e14 !important;
+}
+
+/* Fix potential conflicts with theme styles */
+.fahrplanportal-last-update * {
+    box-sizing: border-box;
+}
+
+.fahrplanportal-last-update p,
+.fahrplanportal-last-update h1,
+.fahrplanportal-last-update h2,
+.fahrplanportal-last-update h3,
+.fahrplanportal-last-update h4,
+.fahrplanportal-last-update h5,
+.fahrplanportal-last-update h6 {
+    margin: 0;
+    padding: 0;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+}
+
+/* Ensure proper z-index stacking */
+.fahrplanportal-last-update {
+    position: relative;
+    z-index: 1;
+}
+
+/* ========================================
+   INTEGRATION HELPERS
+   ======================================== */
+
+/* Helper class for dynamic updates */
+.fahrplanportal-last-update[data-auto-update="true"] {
+    position: relative;
+}
+
+.fahrplanportal-last-update[data-auto-update="true"]::after {
+    content: attr(data-next-update);
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #6c757d;
+    background: rgba(255,255,255,0.9);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #dee2e6;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.fahrplanportal-last-update[data-auto-update="true"]:hover::after {
+    opacity: 1;
+}
