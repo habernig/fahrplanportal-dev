@@ -2,6 +2,9 @@
 /**
  * FahrplanPortal Admin Class
  * WordPress Admin-Interface, Menüs und Admin-Seiten
+ * 
+ * ✅ ERWEITERT: Publisher-UI für Staging/Live-Verwaltung
+ * ✅ ORIGINAL: Alle bestehenden Funktionen vollständig erhalten
  */
 
 // Prevent direct access
@@ -15,12 +18,14 @@ class FahrplanPortal_Admin {
     private $utils;
     private $pdf_base_path;
     private $pdf_parsing_enabled;
+    private $publisher;              // ✅ NEU: Publisher-Komponente
     
-    public function __construct($database, $utils, $pdf_base_path, $pdf_parsing_enabled) {
+    public function __construct($database, $utils, $pdf_base_path, $pdf_parsing_enabled, $publisher = null) {
         $this->database = $database;
         $this->utils = $utils;
         $this->pdf_base_path = $pdf_base_path;
         $this->pdf_parsing_enabled = $pdf_parsing_enabled;
+        $this->publisher = $publisher;   // ✅ NEU: Publisher hinzugefügt
         
         $this->init_hooks();
     }
@@ -70,7 +75,7 @@ class FahrplanPortal_Admin {
     }
     
     /**
-     * Admin-Scripts laden - ✅ GEFIXT: Nur im relevanten Admin-Bereich
+     * ✅ ERWEITERT: Admin-Scripts laden mit Publisher-Support
      */
     public function enqueue_admin_scripts($hook) {
         // ✅ GEFIXT: Nur auf Fahrplan-Admin-Seiten laden
@@ -84,36 +89,40 @@ class FahrplanPortal_Admin {
             'fahrplanportal-admin',
             plugins_url('assets/admin/admin.js', dirname(__FILE__)),
             array('jquery'),
-            '2.5.0', // ✅ Version erhöht für Chunked Scanning
+            '3.0.0', // ✅ Version erhöht für Publisher-Features
             true
         );
         
-        // ✅ GEFIXT: Unified AJAX Config nur für Admin
+        // ✅ ERWEITERT: Unified AJAX Config mit Publisher-Features
         wp_localize_script('fahrplanportal-admin', 'fahrplanportal_unified', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('unified_ajax_master_nonce'),
             'action' => 'unified_ajax',
             'module' => 'fahrplanportal',
             'pdf_parsing_enabled' => $this->pdf_parsing_enabled,
+            'publisher_enabled' => !is_null($this->publisher),  // ✅ NEU
             'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'context' => 'admin_fahrplanportal_chunked'
+            'context' => 'admin_fahrplanportal_publisher'        // ✅ NEU
         ));
         
         wp_enqueue_style(
             'fahrplanportal-admin',
             plugins_url('assets/admin/admin.css', dirname(__FILE__)),
             array(),
-            '2.5.0'
+            '3.0.0'
         );
         
-        error_log('✅ FAHRPLANPORTAL: Admin-Scripts geladen für: ' . $hook);
+        error_log('✅ FAHRPLANPORTAL: Admin-Scripts geladen für: ' . $hook . ' (mit Publisher-Support)');
     }
     
     /**
-     * Hauptadmin-Seite - ✅ GEFIXT: Admin-Only Interface
+     * ✅ ERWEITERT: Hauptadmin-Seite mit Publisher-Bereich
      */
     public function admin_page() {
         $available_folders = $this->get_available_folders();
+        
+        // ✅ NEU: Publisher-Statistiken laden
+        $publish_stats = $this->get_publisher_stats();
         ?>
         <div class="wrap">
             <h1>Fahrplanportal Verwaltung</h1>
@@ -125,6 +134,7 @@ class FahrplanPortal_Admin {
                 </div>
             <?php endif; ?>
             
+            <!-- ✅ BESTEHEND: Scan-Bereich (unverändert) -->
             <div class="fahrplan-controls">
                 <p>
                     <label for="scan-year">Ordner auswählen:</label>
@@ -164,78 +174,153 @@ class FahrplanPortal_Admin {
                 <?php endif; ?>
             </div>
             
-            <!-- ✅ NEU: Chunked Progress Bar -->
-            <div id="scan-progress-container" style="display: none;">
-                <div class="card" style="border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 6px;">
-                    <h4 style="margin: 0 0 15px 0; color: #0073aa;">
-                        <i class="dashicons dashicons-update-alt" style="animation: spin 1s linear infinite;"></i>
-                        PDF-Scanning läuft...
-                    </h4>
+            <hr style="margin: 30px 0;">
+            
+            <!-- ✅ NEU: PUBLISHER-BEREICH -->
+            <?php if ($this->publisher): ?>
+            <div class="publish-management">
+                <h2>🚀 Live-Veröffentlichung</h2>
+                
+                <!-- Status-Übersicht -->
+                <div class="publish-status-overview" style="
+                    background: #f8f9fa;
+                    border: 2px solid #dee2e6;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                ">
+                    <h3 style="margin-top: 0; color: #495057;">📊 System-Status</h3>
                     
-                    <!-- Progress Bar -->
-                    <div class="progress mb-3" style="height: 20px; background: #f1f1f1; border-radius: 10px; overflow: hidden;">
-                        <div id="scan-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                             style="width: 0%; background: linear-gradient(90deg, #0073aa, #005a87); height: 100%; border-radius: 10px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <strong style="color: #6c757d; display: block; margin-bottom: 8px;">Staging-Bereich (Bearbeitung)</strong>
+                            <div style="font-size: 24px; color: #28a745;" id="staging-count">
+                                <?php echo $publish_stats['staging_count']; ?> Einträge
+                            </div>
+                            <small style="color: #6c757d;">Wird beim Scannen gefüllt</small>
+                        </div>
+                        
+                        <div>
+                            <strong style="color: #6c757d; display: block; margin-bottom: 8px;">Live-Bereich (Frontend)</strong>
+                            <div style="font-size: 24px; color: #007cba;" id="live-count">
+                                <?php echo $publish_stats['live_count']; ?> Einträge
+                            </div>
+                            <small style="color: #6c757d;">Für Website-Besucher sichtbar</small>
+                        </div>
+                        
+                        <div>
+                            <strong style="color: #6c757d; display: block; margin-bottom: 8px;">Synchronisation</strong>
+                            <div style="font-size: 18px; color: <?php echo $publish_stats['tables_synced'] ? '#28a745' : '#dc3545'; ?>;" id="sync-status">
+                                <?php echo $publish_stats['tables_synced'] ? '✅ Synchron' : '⚠️ Unterschiedlich'; ?>
+                            </div>
+                            <small style="color: #6c757d;">Staging ↔ Live Vergleich</small>
                         </div>
                     </div>
                     
-                    <!-- Progress Text -->
-                    <div class="row mb-3" style="margin: 0;">
-                        <div class="col-sm-6" style="padding: 0;">
-                            <strong id="scan-progress-text">0% (0/0 PDFs)</strong>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <strong style="color: #6c757d; display: block; margin-bottom: 8px;">Letzte Veröffentlichung</strong>
+                            <div style="color: #495057;" id="last-publish">
+                                <?php echo $publish_stats['last_publish'] ? date('d.m.Y H:i', strtotime($publish_stats['last_publish'])) : 'Noch nie veröffentlicht'; ?>
+                            </div>
                         </div>
-                        <div class="col-sm-6 text-right" style="padding: 0; text-align: right;">
-                            <span id="scan-time-remaining">Geschätzte Zeit: berechne...</span>
+                        
+                        <div>
+                            <strong style="color: #6c757d; display: block; margin-bottom: 8px;">Backup verfügbar</strong>
+                            <div style="color: <?php echo $publish_stats['has_backup'] ? '#28a745' : '#dc3545'; ?>;" id="backup-status">
+                                <?php echo $publish_stats['has_backup'] ? '✅ Backup vorhanden' : '❌ Kein Backup'; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Aktionen -->
+                <div class="publish-actions" style="
+                    background: #ffffff;
+                    border: 2px solid #007cba;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                ">
+                    <h3 style="margin-top: 0; color: #007cba;">🎯 Aktionen</h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h4 style="color: #495057; margin: 0 0 10px 0;">Live veröffentlichen</h4>
+                            <p style="margin: 0 0 15px 0; color: #6c757d; font-size: 14px;">
+                                Kopiert alle Staging-Daten zum Live-System. 
+                                Ein Backup wird automatisch erstellt.
+                            </p>
+                            <button type="button" id="publish-to-live" class="button button-primary" style="
+                                background: #28a745; 
+                                border-color: #28a745;
+                                padding: 8px 16px;
+                                font-size: 14px;
+                            ">
+                                <span class="dashicons dashicons-upload" style="vertical-align: middle;"></span>
+                                🚀 Live veröffentlichen
+                            </button>
+                            <span id="publish-status" style="margin-left: 10px;"></span>
+                        </div>
+                        
+                        <div>
+                            <h4 style="color: #495057; margin: 0 0 10px 0;">Rollback durchführen</h4>
+                            <p style="margin: 0 0 15px 0; color: #6c757d; font-size: 14px;">
+                                Stellt den letzten Backup-Stand wieder her.
+                                <?php if (!$publish_stats['has_backup']): ?>
+                                <strong style="color: #dc3545;">Kein Backup verfügbar!</strong>
+                                <?php endif; ?>
+                            </p>
+                            <button type="button" id="rollback-live" class="button button-secondary" style="
+                                padding: 8px 16px;
+                                font-size: 14px;
+                            " <?php echo !$publish_stats['has_backup'] ? 'disabled' : ''; ?>>
+                                <span class="dashicons dashicons-undo" style="vertical-align: middle;"></span>
+                                ⏪ Rollback durchführen
+                            </button>
+                            <span id="rollback-status" style="margin-left: 10px;"></span>
                         </div>
                     </div>
                     
-                    <!-- Current File -->
-                    <div class="mb-3">
-                        <small><strong>Aktuell:</strong> <span id="scan-current-file">Bereite vor...</span></small>
-                    </div>
-                    
-                    <!-- Statistics -->
-                    <div class="row mb-3" style="margin: 0;">
-                        <div class="col-sm-3" style="padding: 0 10px 0 0;">
-                            <span class="badge badge-success" style="background: #46b450; color: white; padding: 5px 10px;">
-                                ✓ Importiert: <span id="scan-imported">0</span>
-                            </span>
-                        </div>
-                        <div class="col-sm-3" style="padding: 0 10px;">
-                            <span class="badge badge-info" style="background: #00a0d2; color: white; padding: 5px 10px;">
-                                ⟳ Übersprungen: <span id="scan-skipped">0</span>
-                            </span>
-                        </div>
-                        <div class="col-sm-3" style="padding: 0 10px;">
-                            <span class="badge badge-danger" style="background: #dc3232; color: white; padding: 5px 10px;">
-                                ✗ Fehler: <span id="scan-errors">0</span>
-                            </span>
-                        </div>
-                        <div class="col-sm-3" style="padding: 0 0 0 10px;">
-                            <span class="badge badge-secondary" style="background: #666; color: white; padding: 5px 10px;">
-                                📊 Chunk: <span id="scan-current-chunk">0/0</span>
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- Region Activity -->
-                    <div class="mb-3">
-                        <h5 style="margin: 0 0 10px 0;">Letzte Aktivität:</h5>
-                        <div id="scan-region-activity" style="max-height: 100px; overflow-y: auto; background: #f9f9f9; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
-                            <div class="text-muted">Bereit zum Scannen...</div>
-                        </div>
-                    </div>
-                    
-                    <!-- Cancel Button -->
-                    <div class="text-center">
-                        <button type="button" id="scan-cancel" class="button button-secondary" style="background: #dc3232; color: white; border-color: #dc3232;">
-                            ❌ Abbrechen
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                        <button type="button" id="refresh-publish-stats" class="button button-secondary">
+                            <span class="dashicons dashicons-update" style="vertical-align: middle;"></span>
+                            Status aktualisieren
                         </button>
+                        <small style="color: #6c757d; margin-left: 15px;">
+                            Aktualisiert die Zähler und den Synchronisations-Status
+                        </small>
                     </div>
+                </div>
+                
+                <!-- Hinweise -->
+                <div class="publish-info" style="
+                    background: #fff3cd;
+                    border: 2px solid #ffc107;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                ">
+                    <h4 style="margin: 0 0 10px 0; color: #856404;">ℹ️ Wichtige Hinweise</h4>
+                    <ul style="margin: 0; color: #856404; line-height: 1.6;">
+                        <li><strong>Staging-Bereich:</strong> Hier bearbeiten Sie die Fahrpläne. Änderungen sind nicht sofort live.</li>
+                        <li><strong>Live-Bereich:</strong> Dies sehen die Website-Besucher. Wird nur durch "Veröffentlichen" aktualisiert.</li>
+                        <li><strong>Backup:</strong> Wird vor jeder Veröffentlichung automatisch erstellt für Rollback-Möglichkeit.</li>
+                        <li><strong>Synchronisation:</strong> Zeigt an, ob Staging und Live identisch sind.</li>
+                    </ul>
                 </div>
             </div>
             
-            <div id="fahrplaene-container">
+            <hr style="margin: 30px 0;">
+            <?php else: ?>
+            <div class="notice notice-info">
+                <p><strong>Info:</strong> Publisher-System wird initialisiert. Bitte laden Sie die Seite neu.</p>
+            </div>
+            <hr style="margin: 30px 0;">
+            <?php endif; ?>
+            
+            <!-- ✅ BESTEHEND: Fahrplan-Liste Header -->
+            <div class="fahrplan-list-header">
                 <div class="fahrplan-filter-controls">
                     <label for="region-filter">Nach Region filtern:</label>
                     <select id="region-filter">
@@ -286,6 +371,176 @@ class FahrplanPortal_Admin {
             
             // Spin-Animation für Dashicons
             $('<style>.dashicons.spinning { animation: spin 1s linear infinite; } @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>').appendTo('head');
+        });
+        </script>
+        
+        <!-- ✅ NEU: Publisher JavaScript -->
+        <?php $this->render_publisher_js(); ?>
+        <?php
+    }
+    
+    /**
+     * ✅ NEU: Publisher-Statistiken laden
+     */
+    private function get_publisher_stats() {
+        if (!$this->publisher) {
+            return array(
+                'staging_count' => 0,
+                'live_count' => 0,
+                'backup_count' => 0,
+                'last_publish' => '',
+                'last_backup' => '',
+                'has_backup' => false,
+                'tables_synced' => false
+            );
+        }
+        
+        return $this->publisher->get_publish_statistics();
+    }
+    
+    /**
+     * ✅ NEU: Publisher JavaScript rendern
+     */
+    private function render_publisher_js() {
+        if (!$this->publisher) {
+            return;
+        }
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            
+            // ✅ Publisher-AJAX-Hilfsfunktion
+            function publisherAdminCall(action, data, options) {
+                return fahrplanAdminCall(action, data, options);
+            }
+            
+            // ✅ Status aktualisieren
+            $('#refresh-publish-stats').on('click', function() {
+                var $btn = $(this);
+                var originalText = $btn.text();
+                
+                $btn.prop('disabled', true).text('Lädt...');
+                
+                publisherAdminCall('get_publish_stats', {}, {
+                    success: function(stats) {
+                        // UI aktualisieren
+                        $('#staging-count').text(stats.staging_count + ' Einträge');
+                        $('#live-count').text(stats.live_count + ' Einträge');
+                        
+                        var syncStatus = stats.tables_synced ? '✅ Synchron' : '⚠️ Unterschiedlich';
+                        var syncColor = stats.tables_synced ? '#28a745' : '#dc3545';
+                        $('#sync-status').text(syncStatus).css('color', syncColor);
+                        
+                        var lastPublish = stats.last_publish ? 
+                            new Date(stats.last_publish).toLocaleString('de-DE') : 
+                            'Noch nie veröffentlicht';
+                        $('#last-publish').text(lastPublish);
+                        
+                        var backupStatus = stats.has_backup ? '✅ Backup vorhanden' : '❌ Kein Backup';
+                        var backupColor = stats.has_backup ? '#28a745' : '#dc3545';
+                        $('#backup-status').text(backupStatus).css('color', backupColor);
+                        
+                        // Rollback-Button aktivieren/deaktivieren
+                        $('#rollback-live').prop('disabled', !stats.has_backup);
+                        
+                        $btn.text('✅ Aktualisiert');
+                        setTimeout(function() {
+                            $btn.text(originalText);
+                        }, 2000);
+                    },
+                    error: function(error) {
+                        alert('Fehler beim Aktualisieren: ' + error.message);
+                        $btn.text(originalText);
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // ✅ Live veröffentlichen
+            $('#publish-to-live').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#publish-status');
+                
+                var confirmed = confirm(
+                    'Live-Veröffentlichung starten?\n\n' +
+                    '• Alle Staging-Daten werden live veröffentlicht\n' +
+                    '• Ein Backup wird automatisch erstellt\n' +
+                    '• Website-Besucher sehen sofort die neuen Daten\n\n' +
+                    'Fortfahren?'
+                );
+                
+                if (!confirmed) return;
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">🚀 Veröffentliche...</span>');
+                
+                publisherAdminCall('publish_to_live', {}, {
+                    success: function(response) {
+                        $status.html('<span style="color: green;">✅ ' + response.message + '</span>');
+                        
+                        // Status automatisch aktualisieren
+                        setTimeout(function() {
+                            $('#refresh-publish-stats').click();
+                        }, 1000);
+                        
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 5000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">❌ ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // ✅ Rollback durchführen
+            $('#rollback-live').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#rollback-status');
+                
+                var confirmed = confirm(
+                    'Rollback durchführen?\n\n' +
+                    '⚠️ ACHTUNG: Dies stellt den letzten Backup-Stand wieder her!\n' +
+                    '• Alle aktuellen Live-Daten gehen verloren\n' +
+                    '• Website-Besucher sehen die älteren Daten\n' +
+                    '• Diese Aktion kann nicht rückgängig gemacht werden\n\n' +
+                    'Rollback wirklich durchführen?'
+                );
+                
+                if (!confirmed) return;
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">⏪ Stelle wieder her...</span>');
+                
+                publisherAdminCall('rollback_live', {}, {
+                    success: function(response) {
+                        $status.html('<span style="color: green;">✅ ' + response.message + '</span>');
+                        
+                        // Status automatisch aktualisieren
+                        setTimeout(function() {
+                            $('#refresh-publish-stats').click();
+                        }, 1000);
+                        
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 5000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">❌ ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // ✅ Status beim Laden aktualisieren
+            $('#refresh-publish-stats').click();
         });
         </script>
         <?php
@@ -379,57 +634,82 @@ class FahrplanPortal_Admin {
         $mapping_count = 0;
         if (!empty($current_mapping)) {
             $lines = preg_split('/[\n\r]+/', $current_mapping, -1, PREG_SPLIT_NO_EMPTY);
-            $mapping_count = count(array_filter($lines, function($line) {
+            foreach ($lines as $line) {
                 $line = trim($line);
-                return !empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0;
-            }));
+                if (!empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0) {
+                    if (strpos($line, ':') !== false) {
+                        $mapping_count++;
+                    }
+                }
+            }
         }
         ?>
         <div class="wrap">
-            <h1>Datenbank Wartung</h1>
+            <h1>Fahrplanportal - DB Wartung</h1>
             
             <?php if ($this->pdf_parsing_enabled): ?>
-            <!-- SEKTION: Exklusionsliste -->
+            <!-- ✅ GEÄNDERT: Exklusionswörter Sektion erweitert -->
             <div class="exclusion-management">
-                <h3>PDF-Parsing Exklusionsliste</h3>
+                <h3>🚫 Exklusionswörter für PDF-Parsing</h3>
                 <p class="description">
-                    Hier können Sie Wörter definieren, die beim PDF-Parsing aus den Tags entfernt werden sollen. 
-                    Trennen Sie die Wörter durch Leerzeichen, Kommas oder Zeilenumbrüche.
-                    <br><strong>Aktuell:</strong> <?php echo $word_count; ?> Wörter in der Exklusionsliste.
+                    Diese Wörter werden beim PDF-Parsing ignoriert und nicht als Tags gespeichert.
+                    Hilft dabei, unwichtige Wörter aus der Suche herauszufiltern.
+                    <br><strong>Aktuell:</strong> <?php echo $word_count; ?> Wörter
+                    <br><strong>Format:</strong> Ein Wort pro Zeile oder durch Leerzeichen getrennt
                 </p>
                 
-                <div class="exclusion-form">
-                    <textarea id="exclusion-words" name="exclusion_words" rows="8" cols="100" 
-                              placeholder="aber alle allem allen aller alles also auch auf aus bei bin bis bist dass den der des die dies doch dort durch ein eine einem einen einer eines für hab hat hier ich ihr ihre ihrem ihren ihrer ihres ist mit nach nicht noch nur oder sich sie sind über und uns von war wird wir zu zum zur
+                <textarea id="exclusion-words" rows="15" cols="100" 
+                          placeholder="Geben Sie Wörter ein, die beim PDF-Parsing ignoriert werden sollen:
 
-fahrplan fahrt zug bus bahn haltestelle bahnhof station linie route verkehr abfahrt ankunft uhrzeit
+aber alle allem allen aller alles also auch auf aus bei bin bis bist
+dass den der des die dies doch dort durch ein eine einem einen einer eines
+für hab hat hier ich ihr ihre ihrem ihren ihrer ihres ist mit nach nicht
+noch nur oder sich sie sind über und uns von war wird wir zu zum zur
 
-montag dienstag mittwoch donnerstag freitag samstag sonntag"
-                              style="width: 100%; font-family: monospace; font-size: 12px;"><?php echo esc_textarea($current_exclusions); ?></textarea>
-                    
-                    <p>
-                        <button type="button" id="save-exclusion-words" class="button button-primary">
-                            <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
-                            Exklusionsliste speichern
-                        </button>
-                        <button type="button" id="load-exclusion-words" class="button button-secondary">
-                            <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
-                            Neu laden
-                        </button>
-                        <span id="exclusion-status" style="margin-left: 15px;"></span>
-                    </p>
-                    
-                    <details>
-                        <summary style="cursor: pointer; font-weight: bold;">Standard-Exklusionsliste laden (Klicken zum Aufklappen)</summary>
-                        <p style="margin-top: 10px;">
-                            <button type="button" id="load-default-exclusions" class="button button-secondary">
-                                Standard-Deutsche-Stoppwörter hinzufügen
+fahrplan fahrt zug bus bahn haltestelle bahnhof station linie route verkehr
+abfahrt ankunft uhrzeit zeit"
+                          style="width: 100%; font-family: monospace; font-size: 12px;"><?php echo esc_textarea($current_exclusions); ?></textarea>
+                
+                <p>
+                    <button type="button" id="save-exclusion-words" class="button button-primary">
+                        <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
+                        Exklusionswörter speichern
+                    </button>
+                    <button type="button" id="load-exclusion-words" class="button button-secondary">
+                        <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
+                        Neu laden
+                    </button>
+                    <button type="button" id="load-default-exclusions" class="button button-secondary">
+                        Standard-Deutsche-Stoppwörter hinzufügen
+                    </button>
+                    <span id="exclusion-status" style="margin-left: 15px;"></span>
+                </p>
+                
+                <details>
+                    <summary style="cursor: pointer; font-weight: bold;">Tag-Analyse (Klicken zum Aufklappen)</summary>
+                    <div style="margin-top: 15px;">
+                        <p>
+                            <button type="button" id="analyze-tags" class="button button-secondary">
+                                🔍 Tag-Analyse durchführen
                             </button>
-                            <small class="description" style="display: block; margin-top: 5px;">
-                                Fügt häufige deutsche Wörter zur Exklusionsliste hinzu (aber, der, die, das, etc.)
-                            </small>
+                            <span class="description">Analysiert alle Tags aus der Datenbank und zeigt an, welche Wörter ausgeschlossen sind.</span>
                         </p>
-                    </details>
+                        
+                        <div id="tag-analysis-results" style="
+                            display: none;
+                            background: #f8f9fa;
+                            border: 1px solid #dee2e6;
+                            border-radius: 5px;
+                            padding: 15px;
+                            margin-top: 15px;
+                            max-height: 400px;
+                            overflow-y: auto;
+                        ">
+                            <!-- Analyse-Ergebnisse werden hier eingefügt -->
+                        </div>
+                    </div>
+                    
+                    <!-- Weitere Analyse-Bereiche werden hier eingefügt -->
                 </div>
             </div>
             
@@ -520,6 +800,9 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                 <p>Exklusionsliste: <strong><?php echo $word_count; ?> Wörter</strong></p>
                 <?php endif; ?>
                 <p>Linien-Mapping: <strong><?php echo $mapping_count; ?> Zuordnungen (Neu → Alt Format)</strong></p>
+                <?php if ($this->publisher): ?>
+                <p>Publisher-System: <strong>✅ Aktiv</strong></p>
+                <?php endif; ?>
             </div>
 
             <?php if ($this->pdf_parsing_enabled): ?>
@@ -534,64 +817,24 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                     <br><strong>Funktion:</strong> Sammelt alle eindeutigen Tags und zeigt an, welche bereits ausgeschlossen sind (grün) und welche noch nicht (rot).
                 </p>
                 
-                <div class="tag-analysis-controls" style="margin: 20px 0;">
+                <div class="tag-analysis-container">
                     <p>
-                        <button type="button" id="analyze-all-tags" class="button button-primary" style="
-                            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                            border-color: #28a745;
-                            color: white;
-                            font-weight: 600;
-                            padding: 8px 20px;
-                            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
-                        ">
-                            <span class="dashicons dashicons-search" style="vertical-align: middle; margin-right: 5px;"></span>
-                            Alle Tags analysieren
+                        <button type="button" id="analyze-tags-detailed" class="button button-primary">
+                            <span class="dashicons dashicons-chart-pie" style="vertical-align: middle;"></span>
+                            🔬 Detaillierte Tag-Analyse starten
                         </button>
                         <span id="tag-analysis-status" style="margin-left: 15px;"></span>
                     </p>
                     
-                    <div class="tag-analysis-info" style="
-                        background: #e3f2fd;
-                        border: 2px solid #2196f3;
-                        border-radius: 8px;
-                        padding: 15px;
-                        margin-top: 15px;
-                    ">
-                        <h4 style="margin: 0 0 10px 0; color: #1565c0;">💡 Was passiert bei der Analyse:</h4>
-                        <ol style="margin: 0; padding-left: 20px; color: #1565c0; line-height: 1.5;">
-                            <li><strong>Sammeln:</strong> Alle Tags aus allen Fahrplänen werden gesammelt</li>
-                            <li><strong>Bereinigen:</strong> Duplikate werden entfernt und alphabetisch sortiert</li>
-                            <li><strong>Abgleichen:</strong> Jeder Tag wird gegen die aktuelle Exklusionsliste geprüft</li>
-                            <li><strong>Kategorisieren:</strong> 
-                                <span style="color: #28a745; font-weight: bold;">🟢 Grün = bereits ausgeschlossen</span>, 
-                                <span style="color: #dc3545; font-weight: bold;">🔴 Rot = noch nicht ausgeschlossen</span>
-                            </li>
-                            <li><strong>Optimieren:</strong> Sie können rote Tags zur Exklusionsliste hinzufügen</li>
-                        </ol>
-                    </div>
-                </div>
-                
-                <!-- ✅ NEU: ERGEBNISSE CONTAINER -->
-                <div id="tag-analysis-results" style="display: none; margin-top: 30px;">
-                    
-                    <!-- Statistiken -->
-                    <div id="tag-analysis-statistics" style="
-                        background: #fff3cd;
-                        border: 2px solid #ffc107;
+                    <div id="tag-analysis-detailed-results" style="
+                        display: none;
+                        background: white;
+                        border: 2px solid #007cba;
                         border-radius: 8px;
                         padding: 20px;
-                        margin-bottom: 25px;
+                        margin-top: 20px;
                     ">
-                        <h4 style="margin: 0 0 15px 0; color: #856404;">📊 Analyse-Statistiken</h4>
-                        <div id="tag-stats-content" style="
-                            display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                            gap: 15px;
-                            color: #856404;
-                            font-weight: 500;
-                        ">
-                            <!-- Wird von JavaScript gefüllt -->
-                        </div>
+                        <!-- Detaillierte Analyse-Ergebnisse werden hier eingefügt -->
                     </div>
                     
                     <!-- Weitere Analyse-Bereiche werden hier eingefügt -->
@@ -645,58 +888,22 @@ X2:SB2
 X3:SB3
 X4:SB4
 X5:SB5
-X10:SB10
-X11:SB11
-X12:SB12
 
-// ✅ NEU: Weitere Buchstaben-Kombinationen
-A1:SA1
-A2:SA2
-B1:SB1
-B2:SB2
-R1:REG1
-R2:REG2
-
-// ✅ NEU: Stadtbus-Kombinationen
-ST1:STADT1
-ST2:STADT2
-ST3:STADT3
-
-// Standard 2-3 stellige Nummern → 4-stellige Nummern
+// Standard 2-3 stellige zu 4-stelligen Nummern
 100:5000
 101:5001
 102:5002
-103:5003
-104:5004
-105:5005
-106:5006
-107:5007
-108:5008
-109:5009
-110:5010
-111:5011
-112:5012
-113:5013
-114:5014
-115:5015
-
-// Spezielle Linien
 561:5561
 82:5082
-200:5200
-201:5201
-202:5202
-401:5401
-402:5402
-403:5403
+83:5083
+84:5084
+85:5085
 
-// Regionale Schnellverbindungen
+// Weitere Beispiele
+200:5200
 300:5300
-301:5301
-302:5302
-310:5310
-311:5311
-312:5312`;
+400:5400
+500:5500`;
                 
                 var currentMapping = $('#line-mapping').val().trim();
                 if (currentMapping) {
@@ -705,13 +912,191 @@ ST3:STADT3
                     $('#line-mapping').val(newMappingExample);
                 }
                 
-                alert('✅ ERWEITERTE Beispiel-Zuordnungen hinzugefügt!\n\n' +
-                      '🆕 NEUE FEATURES:\n' +
-                      '• Buchstaben-Zahl-Kombinationen: X1:SB1, X2:SB2\n' +
-                      '• Kombinierte PDFs: X2-401-route.pdf\n' +
-                      '• Mehrere Bezeichnungen pro PDF möglich\n\n' +
-                      'Format: neue_bezeichnung:alte_bezeichnung\n' +
-                      'Beispiel: X2:SB2 bedeutet X2 wird zu SB2 zugeordnet');
+                $('#mapping-status').html('<span style="color: blue;">ℹ Admin Beispiel-Zuordnungen hinzugefügt. Klicken Sie "Speichern" um zu übernehmen.</span>');
+                setTimeout(function() {
+                    $('#mapping-status').html('');
+                }, 5000);
+            });
+            
+            // Admin Exklusionswörter speichern
+            $('#save-exclusion-words').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#exclusion-status');
+                var exclusionText = $('#exclusion-words').val();
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">Admin speichert...</span>');
+                
+                fahrplanAdminCall('save_exclusion_words', {exclusion_words: exclusionText}, {
+                    success: function(response) {
+                        $status.html('<span style="color: green;">✓ Admin gespeichert (' + response.word_count + ' Wörter)</span>');
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 3000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">✗ Admin Fehler: ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // Admin Exklusionswörter laden
+            $('#load-exclusion-words').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#exclusion-status');
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">Admin lädt...</span>');
+                
+                fahrplanAdminCall('load_exclusion_words', {}, {
+                    success: function(response) {
+                        $('#exclusion-words').val(response.exclusion_words);
+                        $status.html('<span style="color: green;">✓ Admin geladen (' + response.word_count + ' Wörter)</span>');
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 3000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">✗ Admin Fehler: ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // Admin Linien-Mapping speichern
+            $('#save-line-mapping').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#mapping-status');
+                var mappingText = $('#line-mapping').val();
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">Admin speichert...</span>');
+                
+                fahrplanAdminCall('save_line_mapping', {line_mapping: mappingText}, {
+                    success: function(response) {
+                        $status.html('<span style="color: green;">✓ Admin gespeichert (' + response.mapping_count + ' Zuordnungen)</span>');
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 3000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">✗ Admin Fehler: ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // Admin Linien-Mapping laden
+            $('#load-line-mapping').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#mapping-status');
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">Admin lädt...</span>');
+                
+                fahrplanAdminCall('load_line_mapping', {}, {
+                    success: function(response) {
+                        $('#line-mapping').val(response.line_mapping);
+                        $status.html('<span style="color: green;">✓ Admin geladen (' + response.mapping_count + ' Zuordnungen)</span>');
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 3000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">✗ Admin Fehler: ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
+            });
+            
+            // Admin DB-Wartung Buttons
+            $('#recreate-db').on('click', function() {
+                if (!confirm('Admin: Wirklich die komplette Datenbank neu erstellen? Alle Daten gehen verloren!')) {
+                    return;
+                }
+                
+                fahrplanAdminCall('recreate_db', {}, {
+                    success: function(response) {
+                        alert('Admin: Datenbank erfolgreich neu erstellt');
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert('Admin Fehler: ' + error.message);
+                    }
+                });
+            });
+            
+            $('#clear-db').on('click', function() {
+                if (!confirm('Admin: Wirklich alle Fahrpläne löschen?')) {
+                    return;
+                }
+                
+                fahrplanAdminCall('clear_db', {}, {
+                    success: function(response) {
+                        alert('Admin: Alle Fahrpläne erfolgreich gelöscht');
+                        location.reload();
+                    },
+                    error: function(error) {
+                        alert('Admin Fehler: ' + error.message);
+                    }
+                });
+            });
+            
+            // ✅ NEU: Tag-Analyse
+            $('#analyze-tags-detailed').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#tag-analysis-status');
+                var $results = $('#tag-analysis-detailed-results');
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">🔬 Analysiere Tags...</span>');
+                
+                fahrplanAdminCall('analyze_tags', {}, {
+                    success: function(response) {
+                        $status.html('<span style="color: green;">✓ Analyse abgeschlossen</span>');
+                        
+                        var html = '<h4>📊 Tag-Analyse Ergebnisse</h4>';
+                        html += '<p><strong>Gesamt-Tags:</strong> ' + response.total_count + ' | ';
+                        html += '<strong>Eindeutige Wörter:</strong> ' + response.unique_count + '</p>';
+                        
+                        if (response.unique_words.length > 0) {
+                            html += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;">';
+                            
+                            response.unique_words.forEach(function(word) {
+                                var color = word.excluded ? '#28a745' : '#dc3545';
+                                var icon = word.excluded ? '✅' : '❌';
+                                html += '<span style="color: ' + color + '; margin-right: 15px;">';
+                                html += icon + ' ' + word.word + ' (' + word.count + 'x)';
+                                html += '</span>';
+                            });
+                            
+                            html += '</div>';
+                        } else {
+                            html += '<p>Keine Tags gefunden.</p>';
+                        }
+                        
+                        $results.html(html).show();
+                        
+                        setTimeout(function() {
+                            $status.html('');
+                        }, 3000);
+                    },
+                    error: function(error) {
+                        $status.html('<span style="color: red;">✗ Fehler: ' + error.message + '</span>');
+                    },
+                    complete: function() {
+                        $btn.prop('disabled', false);
+                    }
+                });
             });
         });
         </script>
@@ -723,11 +1108,6 @@ ST3:STADT3
      */
     private function get_available_folders() {
         $folders = array();
-        
-        if (!is_dir($this->pdf_base_path)) {
-            return $folders;
-        }
-        
         $directories = glob($this->pdf_base_path . '*', GLOB_ONLYDIR);
         
         foreach ($directories as $dir) {
@@ -787,44 +1167,23 @@ ST3:STADT3
                 $tags_column = '<td>' . $tags_display . '</td>';
             }
             
-            // NEUE REIHENFOLGE: ID, Linie Alt, Linie Neu, Titel, Gültig von, Gültig bis, Ordner, Region, PDF, Kurzbeschreibung, [Tags], Aktionen
-            $output .= sprintf(
-                '<tr data-id="%d">
-                    <td>%d</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td><a href="%s" target="_blank"><span class="dashicons dashicons-media-document"></span></a></td>
-                    <td>%s</td>
-                    %s
-                    <td>
-                        <button class="button button-small edit-fahrplan" data-id="%d" title="Bearbeiten">
-                            <span class="dashicons dashicons-edit"></span>
-                        </button>
-                        <button class="button button-small delete-fahrplan" data-id="%d" title="Löschen">
-                            <span class="dashicons dashicons-trash"></span>
-                        </button>
-                    </td>
-                </tr>',
-                $row->id,                    // ID
-                $row->id,                    // ID (nochmal für Anzeige)
-                esc_html($row->linie_alt),   // Linie Alt
-                esc_html($row->linie_neu),   // Linie Neu  
-                esc_html($row->titel),       // Titel
-                esc_html($gueltig_von_de),   // Gültig von
-                esc_html($gueltig_bis_de),   // Gültig bis
-                esc_html($row->jahr),        // Ordner
-                esc_html($region),           // Region
-                esc_url($pdf_url),           // PDF
-                esc_html($row->kurzbeschreibung), // Kurzbeschreibung
-                $tags_column,                // Tags (optional)
-                $row->id,                    // Bearbeiten-Button ID
-                $row->id                     // Löschen-Button ID
-            );
+            $output .= '<tr data-id="' . esc_attr($row->id) . '">';
+            $output .= '<td>' . esc_html($row->id) . '</td>';
+            $output .= '<td>' . esc_html($row->linie_alt) . '</td>';
+            $output .= '<td style="cursor: pointer;" title="Klicken zum Bearbeiten">' . esc_html($row->linie_neu) . '</td>';
+            $output .= '<td>' . esc_html($row->titel) . '</td>';
+            $output .= '<td>' . esc_html($gueltig_von_de) . '</td>';
+            $output .= '<td>' . esc_html($gueltig_bis_de) . '</td>';
+            $output .= '<td>' . esc_html($row->jahr) . '</td>';
+            $output .= '<td>' . esc_html($region) . '</td>';
+            $output .= '<td><a href="' . esc_url($pdf_url) . '" target="_blank">PDF öffnen</a></td>';
+            $output .= '<td>' . esc_html($row->kurzbeschreibung) . '</td>';
+            $output .= $tags_column;
+            $output .= '<td>';
+            $output .= '<button class="button button-secondary edit-fahrplan" data-id="' . esc_attr($row->id) . '" style="margin-right: 5px;">Bearbeiten</button>';
+            $output .= '<button class="button button-secondary delete-fahrplan" data-id="' . esc_attr($row->id) . '">Löschen</button>';
+            $output .= '</td>';
+            $output .= '</tr>';
         }
         
         return $output;

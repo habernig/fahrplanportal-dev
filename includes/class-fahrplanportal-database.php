@@ -2,6 +2,10 @@
 /**
  * FahrplanPortal Database Class
  * Alle Datenbankoperationen und Schema-Management
+ * 
+ * ✅ ERWEITERT: Publisher-Integration für Staging/Live-System
+ * ✅ NEU: Live-Tabellen-Zugriff für Frontend
+ * ✅ NEU: Publisher-Statistiken und Metadaten
  */
 
 // Prevent direct access
@@ -11,19 +15,73 @@ if (!defined('ABSPATH')) {
 
 class FahrplanPortal_Database {
     
-    private $table_name;
+    private $table_name;              // Staging-Tabelle (bestehend)
+    private $live_table_name;         // Live-Tabelle für Frontend
     private $pdf_parsing_enabled;
+    private $use_live_data = false;   // Flag für Frontend/Backend-Unterscheidung
     
     public function __construct($pdf_parsing_enabled) {
         global $wpdb;
         
-        $this->table_name = $wpdb->prefix . 'fahrplaene';
+        $this->table_name = $wpdb->prefix . 'fahrplaene';          // Staging
+        $this->live_table_name = $wpdb->prefix . 'fahrplaene_live'; // Live
         $this->pdf_parsing_enabled = $pdf_parsing_enabled;
+        
+        // ✅ Frontend/Backend-Erkennung für automatische Live-Nutzung
+        $this->detect_frontend_context();
         
         // ✅ Admin-Hooks NUR wenn echtes Admin (kein AJAX)
         if (is_admin() && !(defined('DOING_AJAX') && DOING_AJAX)) {
             add_action('admin_init', array($this, 'init_database'));
         }
+    }
+    
+    /**
+     * ✅ NEU: Frontend-Context erkennen und Live-Daten nutzen
+     */
+    private function detect_frontend_context() {
+        // Im Frontend (außer AJAX) → Live-Daten verwenden
+        if (!is_admin() && !(defined('DOING_AJAX') && DOING_AJAX)) {
+            $this->use_live_data = true;
+            error_log('✅ FAHRPLANPORTAL DATABASE: Frontend-Modus → Live-Daten');
+        }
+        // Bei Frontend-AJAX (Shortcode-Suchen) → Live-Daten verwenden
+        elseif (defined('DOING_AJAX') && DOING_AJAX && isset($_POST['module']) && $_POST['module'] === 'fahrplanportal') {
+            // Prüfen ob es Frontend-AJAX ist (z.B. Suche)
+            $frontend_actions = array('frontend_search', 'frontend_suggestions');
+            if (isset($_POST['module_action']) && in_array($_POST['module_action'], $frontend_actions)) {
+                $this->use_live_data = true;
+                error_log('✅ FAHRPLANPORTAL DATABASE: Frontend-AJAX → Live-Daten');
+            }
+        }
+    }
+    
+    /**
+     * ✅ NEU: Aktive Tabelle ermitteln (Staging oder Live)
+     */
+    private function get_active_table() {
+        return $this->use_live_data ? $this->live_table_name : $this->table_name;
+    }
+    
+    /**
+     * ✅ NEU: Live-Daten erzwingen (für Publisher)
+     */
+    public function force_live_data($use_live = true) {
+        $this->use_live_data = $use_live;
+    }
+    
+    /**
+     * ✅ NEU: Live-Tabellennamen für Publisher
+     */
+    public function get_live_table_name() {
+        return $this->live_table_name;
+    }
+    
+    /**
+     * ✅ NEU: Staging-Tabellennamen für Publisher
+     */
+    public function get_staging_table_name() {
+        return $this->table_name;
     }
     
     /**
@@ -121,28 +179,41 @@ class FahrplanPortal_Database {
     }
     
     /**
-     * Einzelnen Fahrplan aus DB laden
+     * ✅ ERWEITERT: Einzelnen Fahrplan aus aktiver Tabelle laden
      */
     public function get_fahrplan($id) {
         global $wpdb;
+        $active_table = $this->get_active_table();
         
         return $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM {$this->table_name} WHERE id = %d",
+            "SELECT * FROM {$active_table} WHERE id = %d",
             $id
         ));
     }
     
     /**
-     * Alle Fahrpläne aus DB laden
+     * ✅ ERWEITERT: Alle Fahrpläne aus aktiver Tabelle laden
      */
     public function get_all_fahrplaene() {
         global $wpdb;
+        $active_table = $this->get_active_table();
         
-        return $wpdb->get_results("SELECT * FROM {$this->table_name} ORDER BY created_at DESC");
+        return $wpdb->get_results("SELECT * FROM {$active_table} ORDER BY created_at DESC");
     }
     
     /**
-     * Fahrplan einfügen
+     * ✅ NEU: Spezifische Tabelle für Abfragen (für Admin-Vergleiche)
+     */
+    public function get_fahrplaene_from_table($table_type = 'staging') {
+        global $wpdb;
+        
+        $table_name = ($table_type === 'live') ? $this->live_table_name : $this->table_name;
+        
+        return $wpdb->get_results("SELECT * FROM {$table_name} ORDER BY created_at DESC");
+    }
+    
+    /**
+     * Fahrplan einfügen (IMMER in Staging-Tabelle)
      */
     public function insert_fahrplan($data) {
         global $wpdb;
@@ -154,6 +225,7 @@ class FahrplanPortal_Database {
             $format_array[] = '%s';
         }
         
+        // IMMER in Staging-Tabelle einfügen (nicht Live)
         $result = $wpdb->insert($this->table_name, $data, $format_array);
         
         if ($result === false) {
@@ -164,7 +236,7 @@ class FahrplanPortal_Database {
     }
     
     /**
-     * Fahrplan aktualisieren
+     * Fahrplan aktualisieren (IMMER in Staging-Tabelle)
      */
     public function update_fahrplan($id, $data) {
         global $wpdb;
@@ -189,6 +261,7 @@ class FahrplanPortal_Database {
             return false;
         }
         
+        // IMMER in Staging-Tabelle aktualisieren (nicht Live)
         return $wpdb->update(
             $this->table_name,
             $update_data,
@@ -199,11 +272,12 @@ class FahrplanPortal_Database {
     }
     
     /**
-     * Fahrplan löschen
+     * Fahrplan löschen (IMMER aus Staging-Tabelle)
      */
     public function delete_fahrplan($id) {
         global $wpdb;
         
+        // IMMER aus Staging-Tabelle löschen (nicht Live)
         return $wpdb->delete(
             $this->table_name,
             array('id' => $id),
@@ -212,31 +286,46 @@ class FahrplanPortal_Database {
     }
     
     /**
-     * Prüfen ob Fahrplan bereits existiert
+     * ✅ ERWEITERT: Prüfen ob Fahrplan bereits existiert (in aktiver Tabelle)
      */
     public function fahrplan_exists($dateiname, $jahr, $region) {
         global $wpdb;
+        $active_table = $this->get_active_table();
         
         return $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$this->table_name} WHERE dateiname = %s AND jahr = %s AND region = %s",
+            "SELECT id FROM {$active_table} WHERE dateiname = %s AND jahr = %s AND region = %s",
             $dateiname, $jahr, $region
         ));
     }
     
     /**
-     * Anzahl Fahrpläne ermitteln
+     * ✅ ERWEITERT: Anzahl Fahrpläne ermitteln (aus aktiver Tabelle)
      */
     public function get_fahrplaene_count() {
         global $wpdb;
-        return $wpdb->get_var("SELECT COUNT(*) FROM {$this->table_name}");
+        $active_table = $this->get_active_table();
+        
+        return $wpdb->get_var("SELECT COUNT(*) FROM {$active_table}");
     }
     
     /**
-     * Datenbank neu erstellen
+     * ✅ NEU: Anzahl aus spezifischer Tabelle
+     */
+    public function get_count_from_table($table_type = 'staging') {
+        global $wpdb;
+        
+        $table_name = ($table_type === 'live') ? $this->live_table_name : $this->table_name;
+        
+        return intval($wpdb->get_var("SELECT COUNT(*) FROM {$table_name}"));
+    }
+    
+    /**
+     * Datenbank neu erstellen (NUR Staging-Tabelle)
      */
     public function recreate_database() {
         global $wpdb;
         
+        // NUR Staging-Tabelle neu erstellen (Live bleibt unberührt)
         $wpdb->query("DROP TABLE IF EXISTS {$this->table_name}");
         
         // ✅ FIX: Direkte Datenbank-Erstellung ohne AJAX-Blockierung
@@ -323,16 +412,17 @@ class FahrplanPortal_Database {
     }
     
     /**
-     * Alle Einträge löschen
+     * Alle Einträge löschen (NUR aus Staging-Tabelle)
      */
     public function clear_database() {
         global $wpdb;
         
+        // NUR Staging-Tabelle leeren (Live bleibt unberührt)
         return $wpdb->query("TRUNCATE TABLE {$this->table_name}");
     }
     
     /**
-     * Alle Tags für Analyse sammeln
+     * ✅ ERWEITERT: Alle Tags für Analyse sammeln (aus aktiver Tabelle)
      */
     public function get_all_tags() {
         global $wpdb;
@@ -341,13 +431,120 @@ class FahrplanPortal_Database {
             return array();
         }
         
-        return $wpdb->get_results("SELECT tags FROM {$this->table_name} WHERE tags IS NOT NULL AND tags != ''");
+        $active_table = $this->get_active_table();
+        
+        return $wpdb->get_results("SELECT tags FROM {$active_table} WHERE tags IS NOT NULL AND tags != ''");
     }
     
     /**
-     * Table name getter
+     * ✅ NEU: Publish-Metadaten verwalten
+     */
+    public function get_last_publish_info() {
+        return array(
+            'last_publish' => get_option('fahrplanportal_last_publish', ''),
+            'last_publish_count' => get_option('fahrplanportal_last_publish_count', 0),
+            'last_backup' => get_option('fahrplanportal_last_backup', ''),
+            'last_rollback' => get_option('fahrplanportal_last_rollback', '')
+        );
+    }
+    
+    /**
+     * ✅ NEU: Letzte Aktualisierung für Frontend (deutsches Format)
+     */
+    public function get_last_update_display() {
+        $last_publish = get_option('fahrplanportal_last_publish', '');
+        
+        if (empty($last_publish)) {
+            return 'Noch nicht veröffentlicht';
+        }
+        
+        $timestamp = strtotime($last_publish);
+        return date('d.m.Y \u\m H:i \U\h\r', $timestamp);
+    }
+    
+    /**
+     * ✅ NEU: Frontend-Suchfunktionen (IMMER aus Live-Tabelle)
+     */
+    public function search_fahrplaene_frontend($search_params) {
+        global $wpdb;
+        
+        // Frontend nutzt IMMER Live-Tabelle
+        $search_table = $this->live_table_name;
+        
+        $where_conditions = array();
+        $bind_params = array();
+        
+        // Suchbedingungen aufbauen
+        if (!empty($search_params['search_term'])) {
+            $search_term = '%' . $wpdb->esc_like($search_params['search_term']) . '%';
+            
+            $search_conditions = array(
+                "titel LIKE %s",
+                "linie_alt LIKE %s", 
+                "linie_neu LIKE %s",
+                "region LIKE %s"
+            );
+            
+            // Tag-Suche nur wenn verfügbar
+            if ($this->pdf_parsing_enabled) {
+                $search_conditions[] = "tags LIKE %s";
+                $bind_params = array_fill(0, 5, $search_term);
+            } else {
+                $bind_params = array_fill(0, 4, $search_term);
+            }
+            
+            $where_conditions[] = "(" . implode(" OR ", $search_conditions) . ")";
+        }
+        
+        // Jahr-Filter
+        if (!empty($search_params['jahr'])) {
+            $where_conditions[] = "jahr = %s";
+            $bind_params[] = $search_params['jahr'];
+        }
+        
+        // Region-Filter
+        if (!empty($search_params['region'])) {
+            $where_conditions[] = "region LIKE %s";
+            $bind_params[] = '%' . $wpdb->esc_like($search_params['region']) . '%';
+        }
+        
+        // SQL zusammenbauen
+        $sql = "SELECT * FROM {$search_table}";
+        
+        if (!empty($where_conditions)) {
+            $sql .= " WHERE " . implode(" AND ", $where_conditions);
+        }
+        
+        $sql .= " ORDER BY titel ASC";
+        
+        // Limit hinzufügen
+        if (isset($search_params['limit'])) {
+            $sql .= " LIMIT " . intval($search_params['limit']);
+        }
+        
+        // Query ausführen
+        if (!empty($bind_params)) {
+            return $wpdb->get_results($wpdb->prepare($sql, $bind_params));
+        } else {
+            return $wpdb->get_results($sql);
+        }
+    }
+    
+    /**
+     * Table name getter (gibt aktive Tabelle zurück)
      */
     public function get_table_name() {
-        return $this->table_name;
+        return $this->get_active_table();
+    }
+    
+    /**
+     * ✅ NEU: Prüfen ob Live-System verfügbar ist
+     */
+    public function is_live_system_available() {
+        global $wpdb;
+        
+        $live_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $this->live_table_name));
+        
+        return !empty($live_exists);
     }
 }

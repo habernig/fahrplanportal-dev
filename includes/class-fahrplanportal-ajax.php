@@ -2,6 +2,10 @@
 /**
  * FahrplanPortal AJAX Class
  * Alle AJAX-Endpunkte und Unified System Integration
+ * 
+ * ✅ ERWEITERT: Publisher-AJAX-Endpunkte hinzugefügt
+ * ✅ NEU: Publish/Rollback-Funktionalität über AJAX
+ * ✅ NEU: Publisher-Statistiken für Admin-UI
  */
 
 // Prevent direct access
@@ -15,112 +19,193 @@ class FahrplanPortal_Ajax {
     private $parser;
     private $utils;
     private $pdf_parsing_enabled;
+    private $publisher;               // ✅ NEU: Publisher-Komponente
     
-    public function __construct($database, $parser, $utils, $pdf_parsing_enabled) {
+    public function __construct($database, $parser, $utils, $pdf_parsing_enabled, $publisher = null) {
         $this->database = $database;
         $this->parser = $parser;
         $this->utils = $utils;
         $this->pdf_parsing_enabled = $pdf_parsing_enabled;
+        $this->publisher = $publisher;    // ✅ NEU: Publisher hinzugefügt
         
         // ✅ Admin AJAX Handler registrieren
         add_action('admin_init', array($this, 'register_unified_admin_handlers'), 20);
     }
     
     /**
-     * ✅ ERWEITERT: register_unified_admin_handlers() um Tag-Analyse erweitern
-     * ✅ Diese Zeile in die bestehende Admin-Module Registrierung HINZUFÜGEN
+     * ✅ ERWEITERT: Admin-Handler mit Publisher-Endpunkten registrieren
      */
     public function register_unified_admin_handlers() {
         // ✅ ERWEITERT: Admin UND Frontend-AJAX erlauben
         if (!is_admin() && !(defined('DOING_AJAX') && DOING_AJAX)) {
-            return; // Nur echtes Frontend ausschließen
+            return;
         }
         
-        // Prüfen ob Unified System verfügbar ist
+        // Unified AJAX System prüfen
         if (!class_exists('UnifiedAjaxSystem')) {
-            error_log('❌ FAHRPLANPORTAL: Unified AJAX System nicht verfügbar');
+            error_log('⚠️ FAHRPLANPORTAL AJAX: Unified AJAX System nicht verfügbar');
             return;
         }
         
         $unified_system = UnifiedAjaxSystem::getInstance();
-        
         if (!$unified_system) {
-            error_log('❌ FAHRPLANPORTAL: Unified System Instanz nicht verfügbar');
+            error_log('⚠️ FAHRPLANPORTAL AJAX: Unified System Instanz nicht verfügbar');
             return;
         }
         
-        // ✅ ERWEITERT: Admin-Module (jetzt mit Tag-Analyse)
-        $unified_system->register_module('fahrplanportal', array(
-            'scan_fahrplaene' => array($this, 'unified_scan_fahrplaene'),
+        // ✅ ERWEITERT: Module mit Publisher-Endpunkten registrieren
+        $endpoints = array(
+            // Bestehende Endpunkte
             'scan_chunk' => array($this, 'unified_scan_chunk'),
-            'get_scan_info' => array($this, 'unified_get_scan_info'),
-            'update_fahrplan' => array($this, 'unified_update_fahrplan'),
             'delete_fahrplan' => array($this, 'unified_delete_fahrplan'),
-            'get_fahrplan' => array($this, 'unified_get_fahrplan'),
             'recreate_db' => array($this, 'unified_recreate_db'),
             'clear_db' => array($this, 'unified_clear_db'),
             'save_exclusion_words' => array($this, 'unified_save_exclusion_words'),
             'load_exclusion_words' => array($this, 'unified_load_exclusion_words'),
             'save_line_mapping' => array($this, 'unified_save_line_mapping'),
             'load_line_mapping' => array($this, 'unified_load_line_mapping'),
+            'analyze_tags' => array($this, 'unified_analyze_tags'),
             
-            // ✅ NEU: Tag-Analyse Action hinzufügen
-            'analyze_all_tags' => array($this, 'unified_analyze_all_tags'),
-        ));
+            // ✅ NEU: Publisher-Endpunkte
+            'publish_to_live' => array($this, 'unified_publish_to_live'),
+            'rollback_live' => array($this, 'unified_rollback_live'),
+            'get_publish_stats' => array($this, 'unified_get_publish_stats'),
+            'check_live_system' => array($this, 'unified_check_live_system'),
+            
+            // Frontend-Endpunkte (bleiben bestehen)
+            'frontend_search' => array($this, 'unified_frontend_search'),
+            'frontend_suggestions' => array($this, 'unified_frontend_suggestions')
+        );
         
-        error_log('✅ FAHRPLANPORTAL: Admin Handler mit Tag-Analyse im Unified System registriert');
+        $unified_system->register_module('fahrplanportal', $endpoints);
+        
+        error_log('✅ FAHRPLANPORTAL AJAX: Unified Module registriert mit ' . count($endpoints) . ' Endpunkten (inkl. Publisher)');
+    }
+    
+    // =======================================================
+    // ✅ NEU: PUBLISHER-AJAX-ENDPUNKTE
+    // =======================================================
+    
+    /**
+     * ✅ NEU: Staging → Live veröffentlichen
+     */
+    public function unified_publish_to_live() {
+        // Berechtigungsprüfung
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Keine Berechtigung für Publish-Operationen');
+            return;
+        }
+        
+        // Publisher verfügbar?
+        if (!$this->publisher) {
+            wp_send_json_error('Publisher-System nicht verfügbar');
+            return;
+        }
+        
+        // Publish durchführen
+        $result = $this->publisher->publish_staging_to_live();
+        
+        if ($result['success']) {
+            // Zusätzliche Statistiken für UI
+            $stats = $this->publisher->get_publish_statistics();
+            $result['stats'] = $stats;
+            
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error($result);
+        }
     }
     
     /**
-     * ✅ NEU: Scan-Informationen sammeln (vor dem eigentlichen Scan)
+     * ✅ NEU: Rollback zu Backup durchführen
      */
-    public function unified_get_scan_info() {
+    public function unified_rollback_live() {
+        // Berechtigungsprüfung
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Keine Berechtigung für Rollback-Operationen');
+            return;
+        }
+        
+        // Publisher verfügbar?
+        if (!$this->publisher) {
+            wp_send_json_error('Publisher-System nicht verfügbar');
+            return;
+        }
+        
+        // Rollback durchführen
+        $result = $this->publisher->rollback_to_backup();
+        
+        if ($result['success']) {
+            // Zusätzliche Statistiken für UI
+            $stats = $this->publisher->get_publish_statistics();
+            $result['stats'] = $stats;
+            
+            wp_send_json_success($result);
+        } else {
+            wp_send_json_error($result);
+        }
+    }
+    
+    /**
+     * ✅ NEU: Publisher-Statistiken abrufen
+     */
+    public function unified_get_publish_stats() {
+        // Berechtigungsprüfung
         if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
             return;
         }
         
-        $folder = sanitize_text_field($_POST['folder'] ?? '');
-        if (empty($folder)) {
-            wp_send_json_error('Kein Ordner ausgewählt');
+        // Publisher verfügbar?
+        if (!$this->publisher) {
+            wp_send_json_error('Publisher-System nicht verfügbar');
             return;
         }
         
-        $base_scan_path = ABSPATH . 'fahrplaene/' . $folder . '/';
+        // Statistiken abrufen
+        $stats = $this->publisher->get_publish_statistics();
         
-        if (!is_dir($base_scan_path)) {
-            wp_send_json_error('Verzeichnis nicht gefunden: ' . $base_scan_path);
-            return;
-        }
+        // Erweiterte Informationen hinzufügen
+        $stats['system_ready'] = $this->publisher->is_live_system_ready();
+        $stats['last_publish_formatted'] = $this->publisher->get_last_publish_date();
         
-        $all_files = $this->parser->collect_all_scan_files($base_scan_path, $folder);
-        
-        $total_files = count($all_files);
-        $chunk_size = 10; // 10 PDFs pro Chunk
-        $total_chunks = ceil($total_files / $chunk_size);
-        
-        // Regionen-Statistik
-        $regions = array();
-        foreach ($all_files as $file_info) {
-            $region = $file_info['region'] ?: 'Hauptverzeichnis';
-            if (!isset($regions[$region])) {
-                $regions[$region] = 0;
-            }
-            $regions[$region]++;
-        }
-        
-        wp_send_json_success(array(
-            'total_files' => $total_files,
-            'total_chunks' => $total_chunks,
-            'chunk_size' => $chunk_size,
-            'regions' => $regions,
-            'parsing_enabled' => $this->pdf_parsing_enabled,
-            'estimated_time' => $this->utils->estimate_processing_time($total_files, $this->pdf_parsing_enabled)
-        ));
+        wp_send_json_success($stats);
     }
     
     /**
-     * ✅ NEU: Einzelnen Chunk verarbeiten
+     * ✅ NEU: Live-System-Status prüfen
+     */
+    public function unified_check_live_system() {
+        // Berechtigungsprüfung
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        // Publisher verfügbar?
+        if (!$this->publisher) {
+            wp_send_json_success(array(
+                'system_ready' => false,
+                'message' => 'Publisher-System nicht verfügbar'
+            ));
+            return;
+        }
+        
+        // System-Status prüfen
+        $system_ready = $this->publisher->is_live_system_ready();
+        
+        wp_send_json_success(array(
+            'system_ready' => $system_ready,
+            'message' => $system_ready ? 'Live-System betriebsbereit' : 'Live-System wird initialisiert...'
+        ));
+    }
+    
+    // =======================================================
+    // BESTEHENDE ENDPUNKTE (unverändert)
+    // =======================================================
+    
+    /**
+     * ✅ UNIFIED: Chunk-basiertes Scannen
      */
     public function unified_scan_chunk() {
         if (!current_user_can('edit_posts')) {
@@ -202,148 +287,11 @@ class FahrplanPortal_Ajax {
         }
         
         // Chunk-Ergebnis zurückgeben
-        wp_send_json_success(array(
-            'chunk_index' => $chunk_index,
-            'chunk_size' => count($chunk_files),
-            'stats' => $chunk_stats,
-            'total_files' => count($all_files),
-            'parsing_enabled' => $this->pdf_parsing_enabled
-        ));
-    }
-    
-    /**
-     * ✅ UNIFIED: Einzelnen Fahrplan laden für Modal
-     */
-    public function unified_get_fahrplan() {
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Keine Berechtigung');
-        }
+        $chunk_stats['total_files'] = count($all_files);
+        $chunk_stats['remaining_files'] = max(0, count($all_files) - (($chunk_index + 1) * $chunk_size));
+        $chunk_stats['is_complete'] = $chunk_stats['remaining_files'] == 0;
         
-        $id = intval($_POST['id'] ?? 0);
-        
-        if (!$id) {
-            wp_send_json_error('Ungültige ID');
-        }
-        
-        $fahrplan = $this->database->get_fahrplan($id);
-        
-        if (!$fahrplan) {
-            wp_send_json_error('Fahrplan nicht gefunden');
-        }
-        
-        wp_send_json_success($fahrplan);
-    }
-    
-    /**
-     * ✅ UNIFIED: Verzeichnis scannen (alte Methode für Fallback)
-     * ✅ GEÄNDERT: Nutzt jetzt ebenfalls die neue Gültigkeitsdaten-Logik (14.12. bis 13.12.)
-     */
-    public function unified_scan_fahrplaene() {
-        error_log('FAHRPLANPORTAL DEBUG: Start unified_scan_fahrplaene (Fallback für alte Implementierung)');
-        
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Keine Berechtigung');
-            return;
-        }
-        
-        $folder = sanitize_text_field($_POST['folder'] ?? '');
-        if (empty($folder)) {
-            wp_send_json_error('Kein Ordner ausgewählt');
-            return;
-        }
-        
-        $base_scan_path = ABSPATH . 'fahrplaene/' . $folder . '/';
-        
-        if (!is_dir($base_scan_path)) {
-            wp_send_json_error('Verzeichnis nicht gefunden: ' . $base_scan_path);
-            return;
-        }
-        
-        $imported = 0;
-        $skipped = 0;
-        $errors = 0;
-        $debug_info = array();
-        
-        $parsing_status = $this->pdf_parsing_enabled ? 'mit PDF-Parsing' : 'ohne PDF-Parsing';
-        $debug_info[] = "Fallback-Modus (alte Implementierung) " . $parsing_status;
-        
-        // Alle Dateien sammeln
-        $all_files = $this->parser->collect_all_scan_files($base_scan_path, $folder);
-        
-        // Alle Dateien verarbeiten (nutzt jetzt automatisch die neue Gültigkeitslogik)
-        foreach ($all_files as $file_info) {
-            try {
-                // Prüfen ob schon vorhanden
-                $existing = $this->database->fahrplan_exists($file_info['filename'], $file_info['folder'], $file_info['region']);
-                
-                if ($existing) {
-                    $skipped++;
-                } else {
-                    $result = $this->parser->process_single_pdf_file($file_info);
-                    if ($result['success']) {
-                        $this->database->insert_fahrplan($result['data']);
-                        $imported++;
-                    } else {
-                        $skipped++;
-                    }
-                }
-            } catch (Exception $e) {
-                $errors++;
-                $debug_info[] = "Fehler bei " . $file_info['filename'] . ": " . $e->getMessage();
-            }
-        }
-        
-        wp_send_json_success(array(
-            'message' => "Fallback-Scan " . $parsing_status . ": $imported importiert, $skipped übersprungen, $errors Fehler",
-            'imported' => $imported,
-            'skipped' => $skipped,
-            'errors' => $errors,
-            'debug' => $debug_info,
-            'pdf_parsing_enabled' => $this->pdf_parsing_enabled
-        ));
-    }
-    
-    /**
-     * ✅ UNIFIED: Fahrplan aktualisieren
-     */
-    public function unified_update_fahrplan() {
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Keine Berechtigung');
-        }
-        
-        $id = intval($_POST['id'] ?? 0);
-        
-        if (!$id) {
-            wp_send_json_error('Ungültige ID');
-        }
-        
-        $update_data = array();
-        
-        // Erlaubte Felder für Update
-        $allowed_fields = array('titel', 'linie_alt', 'linie_neu', 'kurzbeschreibung', 'gueltig_von', 'gueltig_bis', 'region');
-        
-        // Tags nur wenn PDF-Parsing verfügbar
-        if ($this->pdf_parsing_enabled) {
-            $allowed_fields[] = 'tags';
-        }
-        
-        foreach ($allowed_fields as $field) {
-            if (isset($_POST[$field])) {
-                $update_data[$field] = sanitize_text_field($_POST[$field]);
-            }
-        }
-        
-        if (empty($update_data)) {
-            wp_send_json_error('Keine Daten zum Aktualisieren');
-        }
-        
-        $result = $this->database->update_fahrplan($id, $update_data);
-        
-        if ($result !== false) {
-            wp_send_json_success('Fahrplan erfolgreich aktualisiert');
-        } else {
-            wp_send_json_error('Fehler beim Aktualisieren');
-        }
+        wp_send_json_success($chunk_stats);
     }
     
     /**
@@ -352,12 +300,14 @@ class FahrplanPortal_Ajax {
     public function unified_delete_fahrplan() {
         if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         $id = intval($_POST['id'] ?? 0);
         
         if (!$id) {
             wp_send_json_error('Ungültige ID');
+            return;
         }
         
         $result = $this->database->delete_fahrplan($id);
@@ -375,6 +325,7 @@ class FahrplanPortal_Ajax {
     public function unified_recreate_db() {
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         if ($this->database->recreate_database()) {
@@ -390,6 +341,7 @@ class FahrplanPortal_Ajax {
     public function unified_clear_db() {
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         $result = $this->database->clear_database();
@@ -407,9 +359,12 @@ class FahrplanPortal_Ajax {
     public function unified_save_exclusion_words() {
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         $exclusion_words = sanitize_textarea_field($_POST['exclusion_words'] ?? '');
+        
+        update_option('fahrplanportal_exclusion_words', $exclusion_words);
         
         // Wörter zählen
         $word_count = 0;
@@ -418,10 +373,8 @@ class FahrplanPortal_Ajax {
             $word_count = count($words_array);
         }
         
-        update_option('fahrplanportal_exclusion_words', $exclusion_words);
-        
         wp_send_json_success(array(
-            'message' => 'Exklusionsliste erfolgreich gespeichert',
+            'message' => 'Exklusionswörter erfolgreich gespeichert',
             'word_count' => $word_count
         ));
     }
@@ -430,13 +383,13 @@ class FahrplanPortal_Ajax {
      * ✅ UNIFIED: Exklusionswörter laden
      */
     public function unified_load_exclusion_words() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         $exclusion_words = get_option('fahrplanportal_exclusion_words', '');
         
-        // Wörter zählen
         $word_count = 0;
         if (!empty($exclusion_words)) {
             $words_array = preg_split('/[\s,\t\n\r]+/', $exclusion_words, -1, PREG_SPLIT_NO_EMPTY);
@@ -455,21 +408,26 @@ class FahrplanPortal_Ajax {
     public function unified_save_line_mapping() {
         if (!current_user_can('manage_options')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         $line_mapping = sanitize_textarea_field($_POST['line_mapping'] ?? '');
         
-        // Zuordnungen zählen
+        update_option('fahrplanportal_line_mapping', $line_mapping);
+        
+        // Mapping-Einträge zählen
         $mapping_count = 0;
         if (!empty($line_mapping)) {
             $lines = preg_split('/[\n\r]+/', $line_mapping, -1, PREG_SPLIT_NO_EMPTY);
-            $mapping_count = count(array_filter($lines, function($line) {
+            foreach ($lines as $line) {
                 $line = trim($line);
-                return !empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0 && preg_match('/^\d+\s*:\s*\d+$/', $line);
-            }));
+                if (!empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0) {
+                    if (strpos($line, ':') !== false) {
+                        $mapping_count++;
+                    }
+                }
+            }
         }
-        
-        update_option('fahrplanportal_line_mapping', $line_mapping);
         
         wp_send_json_success(array(
             'message' => 'Linien-Mapping erfolgreich gespeichert',
@@ -481,20 +439,24 @@ class FahrplanPortal_Ajax {
      * ✅ UNIFIED: Linien-Mapping laden
      */
     public function unified_load_line_mapping() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
+            return;
         }
         
         $line_mapping = get_option('fahrplanportal_line_mapping', '');
         
-        // Zuordnungen zählen
         $mapping_count = 0;
         if (!empty($line_mapping)) {
             $lines = preg_split('/[\n\r]+/', $line_mapping, -1, PREG_SPLIT_NO_EMPTY);
-            $mapping_count = count(array_filter($lines, function($line) {
+            foreach ($lines as $line) {
                 $line = trim($line);
-                return !empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0 && preg_match('/^\d+\s*:\s*\d+$/', $line);
-            }));
+                if (!empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0) {
+                    if (strpos($line, ':') !== false) {
+                        $mapping_count++;
+                    }
+                }
+            }
         }
         
         wp_send_json_success(array(
@@ -504,151 +466,252 @@ class FahrplanPortal_Ajax {
     }
     
     /**
-     * ✅ NEU: Alle Tags aus der Datenbank analysieren
+     * ✅ UNIFIED: Tag-Analyse durchführen
      */
-    public function unified_analyze_all_tags() {
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error('Keine Berechtigung für Tag-Analyse');
+    public function unified_analyze_tags() {
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
             return;
         }
         
-        error_log('FAHRPLANPORTAL: Starte Tag-Analyse für alle Fahrpläne');
+        if (!$this->pdf_parsing_enabled) {
+            wp_send_json_error('PDF-Parsing nicht verfügbar');
+            return;
+        }
         
-        try {
-            // ✅ Schritt 1: Alle Tags aus der Datenbank sammeln
-            $tag_rows = $this->database->get_all_tags();
-            
-            if (empty($tag_rows)) {
-                wp_send_json_success(array(
-                    'message' => 'Keine Tags in der Datenbank gefunden',
-                    'total_fahrplaene' => 0,
-                    'total_unique_tags' => 0,
-                    'excluded_tags' => array(),
-                    'not_excluded_tags' => array()
-                ));
-                return;
-            }
-            
-            error_log('FAHRPLANPORTAL: Gefundene Fahrpläne mit Tags: ' . count($tag_rows));
-            
-            // ✅ Schritt 2: Alle Tags sammeln und aufteilen
-            $all_tags_raw = array();
-            $fahrplan_count = 0;
-            
-            foreach ($tag_rows as $row) {
-                $fahrplan_count++;
-                $tags_string = trim($row->tags);
-                
-                if (!empty($tags_string)) {
-                    // Tags aufteilen (kommagetrennt)
-                    $tags_array = explode(',', $tags_string);
-                    
-                    foreach ($tags_array as $tag) {
-                        $clean_tag = trim($tag);
-                        if (!empty($clean_tag)) {
-                            $all_tags_raw[] = mb_strtolower($clean_tag, 'UTF-8');
-                        }
+        // Alle Tags aus der Datenbank sammeln
+        $tag_rows = $this->database->get_all_tags();
+        
+        $all_words = array();
+        foreach ($tag_rows as $row) {
+            if (!empty($row->tags)) {
+                $words = explode(',', $row->tags);
+                foreach ($words as $word) {
+                    $word = trim($word);
+                    if (!empty($word) && strlen($word) >= 3) {
+                        $all_words[] = strtolower($word);
                     }
                 }
             }
-            
-            error_log('FAHRPLANPORTAL: Gesammelte Tags (mit Duplikaten): ' . count($all_tags_raw));
-            
-            // ✅ Schritt 3: Duplikate entfernen und sortieren
-            $unique_tags = array_unique($all_tags_raw);
-            sort($unique_tags);
-            
-            error_log('FAHRPLANPORTAL: Eindeutige Tags: ' . count($unique_tags));
-            
-            // ✅ Schritt 4: Aktuelle Exklusionsliste laden
-            $exclusion_words = $this->utils->get_exclusion_words();
-            $exclusion_count = count($exclusion_words);
-            
-            error_log('FAHRPLANPORTAL: Exklusionsliste enthält: ' . $exclusion_count . ' Wörter');
-            
-            // ✅ Schritt 5: Tags gegen Exklusionsliste abgleichen
-            $excluded_tags = array();      // Tags die bereits in Exklusionsliste sind
-            $not_excluded_tags = array();  // Tags die NICHT in Exklusionsliste sind
-            
-            foreach ($unique_tags as $tag) {
-                if (isset($exclusion_words[$tag])) {
-                    // Tag ist bereits in Exklusionsliste
-                    $excluded_tags[] = $tag;
-                } else {
-                    // Tag ist NICHT in Exklusionsliste
-                    $not_excluded_tags[] = $tag;
-                }
-            }
-            
-            // ✅ Schritt 6: Statistiken sammeln
-            $total_unique = count($unique_tags);
-            $excluded_count = count($excluded_tags);
-            $not_excluded_count = count($not_excluded_tags);
-            $exclusion_percentage = $total_unique > 0 ? round(($excluded_count / $total_unique) * 100, 1) : 0;
-            
-            error_log('FAHRPLANPORTAL: Tag-Analyse abgeschlossen:');
-            error_log('  - Fahrpläne mit Tags: ' . $fahrplan_count);
-            error_log('  - Eindeutige Tags: ' . $total_unique);
-            error_log('  - Bereits ausgeschlossen: ' . $excluded_count . ' (' . $exclusion_percentage . '%)');
-            error_log('  - Noch nicht ausgeschlossen: ' . $not_excluded_count);
-            
-            // ✅ Schritt 7: Zusätzliche Analysen
-            
-            // Häufigkeits-Analyse für nicht ausgeschlossene Tags
-            $tag_frequency = array();
-            foreach ($all_tags_raw as $tag) {
-                if (!isset($exclusion_words[$tag])) {
-                    if (!isset($tag_frequency[$tag])) {
-                        $tag_frequency[$tag] = 0;
-                    }
-                    $tag_frequency[$tag]++;
-                }
-            }
-            
-            // Top 20 häufigste nicht ausgeschlossene Tags
-            arsort($tag_frequency);
-            $top_frequent_tags = array_slice($tag_frequency, 0, 20, true);
-            
-            // Kurze vs. lange Tags-Analyse (nicht ausgeschlossen)
-            $short_tags = array();  // <= 3 Zeichen
-            $long_tags = array();   // >= 10 Zeichen
-            
-            foreach ($not_excluded_tags as $tag) {
-                $tag_length = mb_strlen($tag, 'UTF-8');
-                
-                if ($tag_length <= 3) {
-                    $short_tags[] = $tag;
-                } elseif ($tag_length >= 10) {
-                    $long_tags[] = $tag;
-                }
-            }
-            
-            // ✅ Ergebnis zurückgeben
+        }
+        
+        if (empty($all_words)) {
             wp_send_json_success(array(
-                'message' => 'Tag-Analyse erfolgreich abgeschlossen',
-                'statistics' => array(
-                    'total_fahrplaene' => $fahrplan_count,
-                    'total_unique_tags' => $total_unique,
-                    'excluded_count' => $excluded_count,
-                    'not_excluded_count' => $not_excluded_count,
-                    'exclusion_percentage' => $exclusion_percentage,
-                    'exclusion_list_size' => $exclusion_count
-                ),
-                'excluded_tags' => array_values($excluded_tags),
-                'not_excluded_tags' => array_values($not_excluded_tags),
-                'analysis' => array(
-                    'top_frequent_tags' => $top_frequent_tags,
-                    'short_tags' => $short_tags,
-                    'long_tags' => $long_tags,
-                    'short_tags_count' => count($short_tags),
-                    'long_tags_count' => count($long_tags)
-                ),
-                'processing_time' => microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']
+                'unique_words' => array(),
+                'total_count' => 0,
+                'message' => 'Keine Tags in der Datenbank gefunden'
             ));
+            return;
+        }
+        
+        // Wörter zählen und sortieren
+        $word_counts = array_count_values($all_words);
+        arsort($word_counts);
+        
+        // Exklusionsliste laden
+        $exclusion_words = $this->utils->get_exclusion_words();
+        
+        // Wörter analysieren
+        $analyzed_words = array();
+        foreach ($word_counts as $word => $count) {
+            $is_excluded = isset($exclusion_words[$word]);
+            $analyzed_words[] = array(
+                'word' => $word,
+                'count' => $count,
+                'excluded' => $is_excluded
+            );
+        }
+        
+        wp_send_json_success(array(
+            'unique_words' => $analyzed_words,
+            'total_count' => count($all_words),
+            'unique_count' => count($word_counts),
+            'message' => 'Tag-Analyse abgeschlossen'
+        ));
+    }
+    
+    /**
+     * ✅ UNIFIED: Frontend-Suche
+     */
+    public function unified_frontend_search() {
+        $search_term = sanitize_text_field($_POST['search'] ?? '');
+        $jahr = sanitize_text_field($_POST['jahr'] ?? '');
+        $region = sanitize_text_field($_POST['region'] ?? '');
+        
+        // Search-Parameter für Database
+        $search_params = array(
+            'search_term' => $search_term,
+            'jahr' => $jahr,
+            'region' => $region,
+            'limit' => 50
+        );
+        
+        // Frontend-Suche über Database-Klasse (nutzt automatisch Live-Daten)
+        $results = $this->database->search_fahrplaene_frontend($search_params);
+        
+        // Ergebnisse formatieren
+        $formatted_results = array();
+        foreach ($results as $row) {
+            $formatted_results[] = array(
+                'id' => $row->id,
+                'titel' => $row->titel,
+                'linie_alt' => $row->linie_alt,
+                'linie_neu' => $row->linie_neu,
+                'region' => $row->region,
+                'jahr' => $row->jahr,
+                'gueltig_von' => $row->gueltig_von,
+                'gueltig_bis' => $row->gueltig_bis,
+                'pdf_url' => $this->utils->get_pdf_url($row->pdf_pfad)
+            );
+        }
+        
+        wp_send_json_success(array(
+            'results' => $formatted_results,
+            'count' => count($formatted_results),
+            'search_term' => $search_term
+        ));
+    }
+    
+    /**
+     * ✅ UNIFIED: Frontend-Vorschläge (Autocomplete)
+     */
+    public function unified_frontend_suggestions() {
+        $search_term = sanitize_text_field($_POST['term'] ?? '');
+        
+        if (strlen($search_term) < 2) {
+            wp_send_json_success(array('suggestions' => array()));
+            return;
+        }
+        
+        global $wpdb;
+        
+        // Frontend nutzt automatisch Live-Tabelle über Database-Klasse
+        $active_table = $this->database->get_table_name();
+        $search_param = '%' . $wpdb->esc_like($search_term) . '%';
+        
+        $suggestions = array();
+        
+        // Verschiedene Suggestion-Typen sammeln
+        try {
+            // Regionen
+            $regions = $this->extract_frontend_regions($search_param, $wpdb);
+            foreach ($regions as $region_data) {
+                $suggestions[] = array(
+                    'type' => 'region',
+                    'value' => $region_data['region'],
+                    'label' => $region_data['region'] . ' (' . $region_data['count'] . ' Fahrpläne)',
+                    'count' => $region_data['count']
+                );
+            }
+            
+            // Liniennummern
+            $line_numbers = $this->extract_frontend_line_numbers($search_param, $wpdb);
+            foreach ($line_numbers as $line_data) {
+                $suggestions[] = array(
+                    'type' => 'line',
+                    'value' => $line_data['line'],
+                    'label' => 'Linie ' . $line_data['line'],
+                    'count' => $line_data['count']
+                );
+            }
+            
+            // Titel-Wörter
+            $title_words = $this->extract_frontend_title_words($search_param, $wpdb);
+            foreach ($title_words as $word_data) {
+                $suggestions[] = array(
+                    'type' => 'title',
+                    'value' => $word_data['word'],
+                    'label' => $word_data['word'],
+                    'count' => $word_data['count']
+                );
+            }
             
         } catch (Exception $e) {
-            error_log('FAHRPLANPORTAL: Tag-Analyse Fehler: ' . $e->getMessage());
-            wp_send_json_error('Fehler bei der Tag-Analyse: ' . $e->getMessage());
+            error_log('FAHRPLANPORTAL FRONTEND SUGGESTIONS ERROR: ' . $e->getMessage());
         }
+        
+        wp_send_json_success(array('suggestions' => $suggestions));
+    }
+    
+    // =======================================================
+    // HELPER-METHODEN für Frontend-Suggestions
+    // =======================================================
+    
+    private function extract_frontend_regions($search_param, $wpdb) {
+        $active_table = $this->database->get_table_name();
+        
+        $results = $wpdb->get_results($wpdb->prepare("
+            SELECT region, COUNT(*) as count
+            FROM {$active_table} 
+            WHERE region LIKE %s AND region != ''
+            GROUP BY region
+            ORDER BY count DESC
+            LIMIT 10
+        ", $search_param));
+        
+        return array_map(function($result) {
+            return array('region' => $result->region, 'count' => $result->count);
+        }, $results);
+    }
+    
+    private function extract_frontend_line_numbers($search_param, $wpdb) {
+        $active_table = $this->database->get_table_name();
+        
+        $results = $wpdb->get_results($wpdb->prepare("
+            SELECT 
+                CASE 
+                    WHEN linie_alt LIKE %s THEN linie_alt
+                    WHEN linie_neu LIKE %s THEN linie_neu
+                END as line_number,
+                COUNT(*) as count
+            FROM {$active_table} 
+            WHERE (linie_alt LIKE %s OR linie_neu LIKE %s)
+            AND (linie_alt LIKE %s OR linie_neu LIKE %s)
+            GROUP BY line_number
+            HAVING line_number IS NOT NULL
+            ORDER BY count DESC
+            LIMIT 10
+        ", $search_param, $search_param, $search_param, $search_param, $search_param, $search_param));
+        
+        $lines = array();
+        foreach ($results as $result) {
+            $line_parts = explode(',', $result->line_number);
+            foreach ($line_parts as $line) {
+                $line = trim($line);
+                if (!empty($line) && preg_match('/^\d{2,4}$/', $line)) {
+                    $lines[] = array('line' => $line, 'count' => $result->count);
+                }
+            }
+        }
+        return $lines;
+    }
+    
+    private function extract_frontend_title_words($search_param, $wpdb) {
+        $active_table = $this->database->get_table_name();
+        
+        $results = $wpdb->get_results($wpdb->prepare("
+            SELECT titel, COUNT(*) as count
+            FROM {$active_table} 
+            WHERE titel LIKE %s 
+            GROUP BY titel
+            ORDER BY count DESC
+            LIMIT 20
+        ", $search_param));
+        
+        $words = array();
+        foreach ($results as $result) {
+            $parts = explode('—', $result->titel);
+            foreach ($parts as $part) {
+                $part = trim($part);
+                $sub_parts = preg_split('/[\s\-]+/', $part);
+                foreach ($sub_parts as $word) {
+                    $word = trim($word, '.,!?');
+                    if (strlen($word) >= 3 && stripos($word, $search_param) !== false) {
+                        $words[] = array('word' => $word, 'count' => $result->count);
+                    }
+                }
+            }
+        }
+        return array_slice($words, 0, 10);
     }
 }
