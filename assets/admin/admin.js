@@ -1,8 +1,3 @@
-/*
- * Dateiname: assets/admin/admin.js
- */
-
-
 jQuery(document).ready(function($) {
     
     // ✅ SOFORT-FIX: Strikte Admin-Kontext-Prüfung

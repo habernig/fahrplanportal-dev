@@ -1,9 +1,7 @@
 /**
- * Dateiname: assets/frontend/fahrplanportal.js
  * Fahrplanportal Frontend JavaScript
  * Externe JavaScript-Datei für das Fahrplanportal
  */
-
 
 console.log("🚀 Fahrplanportal External JavaScript geladen");
 
