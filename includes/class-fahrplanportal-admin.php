@@ -146,15 +146,14 @@ class FahrplanPortal_Admin {
                 <?php if (empty($available_folders)): ?>
                     <p class="description" style="color: #d63031;">
                         <strong>Hinweis:</strong> Keine Unterordner im Verzeichnis <code><?php echo esc_html($this->pdf_base_path); ?></code> gefunden.
-                        <br>Erstelle Ordner wie <code>2025</code>, <code>testverzeichnis</code> etc. und lade PDF-Dateien hinein.
+                        <br>Erstelle Ordner wie <code>2026</code>, <code>2027</code> etc. und lade PDF-Dateien hinein.
                     </p>
                 <?php else: ?>
                     <p class="description">
                         <strong>Gefundene Ordner:</strong> <?php echo implode(', ', $available_folders); ?>
                         <br><strong>Struktur:</strong> <code>fahrplaene/[Ordner]/[Region]/fahrplan.pdf</code>
-                        <br><strong>Beispiel:</strong> <code>fahrplaene/2025/villach-land/561-feldkirchen-unterberg.pdf</code> (2-3 stellige Nummern)
-                        <br><strong>⚠️ Gültigkeit:</strong> Ordner <code>2025</code> = Fahrpläne gültig vom <strong>14.12.2024 bis 13.12.2025</strong>
-                        <br><strong>🔄 Neue Nummernlogik:</strong> 2-3 stellige Nummern (561, 82) werden über Mapping zu alten 4-stelligen Nummern zugeordnet
+                        <br><strong>Beispiel:</strong> <code>fahrplaene/2026/villach-land/561-feldkirchen-unterberg.pdf</code>
+                        <br><strong>⚠️ Gültigkeit:</strong> Ordner <code>[2026]</code> = Fahrpläne gültig vom <strong>14.12.[2025] bis 13.12.[2026]</strong>
                         <?php if ($this->pdf_parsing_enabled): ?>
                             <br><strong>PDF-Parsing:</strong> Aktiviert - Inhalte werden automatisch geparst und als Tags gespeichert!
                         <?php else: ?>
