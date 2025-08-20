@@ -1666,6 +1666,92 @@ function initializeFahrplanportalAdmin() {
             }
         });
     });
+
+
+    // ✅ NEU: Mapping Tabelle mit DB aktualisieren
+    $('#update-mapping-in-db').on('click', function() {
+        var $btn = $(this);
+        var $status = $('#mapping-status');
+        
+        // Bestätigung anfordern
+        if (!confirm('Mapping-Tabelle mit Datenbank abgleichen?\n\nDies aktualisiert alle bestehenden Fahrpläne mit den neuen Mapping-Zuordnungen.')) {
+            return;
+        }
+        
+        // Button deaktivieren und Status anzeigen
+        $btn.prop('disabled', true);
+        $btn.html('<span class="dashicons dashicons-update-alt" style="animation: spin 1s linear infinite; vertical-align: middle; margin-right: 5px;"></span>Gleiche ab...');
+        $status.html('<span style="color: orange;">🔄 Prüfe alle Fahrpläne gegen aktuelle Mapping-Konfiguration...</span>');
+        
+        console.log('🔄 FAHRPLANPORTAL: Starte Mapping-DB-Abgleich');
+        
+        fahrplanAdminCall('update_mapping_in_db', {}, {
+            success: function(response) {
+                console.log('✅ FAHRPLANPORTAL: Mapping-DB-Abgleich erfolgreich:', response);
+                
+                // Button zurücksetzen
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>Mapping Tabelle mit dB aktualisieren');
+                
+                // Erfolgs-Nachricht mit Details
+                var message = '✅ DB-Abgleich abgeschlossen:<br>';
+                message += '📊 ' + response.total_fahrplaene + ' Fahrpläne geprüft<br>';
+                message += '✏️ ' + response.updates_performed + ' Aktualisierungen durchgeführt<br>';
+                message += '✔️ ' + response.already_correct + ' bereits korrekt<br>';
+                
+                if (response.no_mapping_found > 0) {
+                    message += '⚠️ ' + response.no_mapping_found + ' ohne Mapping<br>';
+                }
+                
+                if (response.updates_failed > 0) {
+                    message += '❌ ' + response.updates_failed + ' fehlgeschlagen<br>';
+                }
+                
+                // Change-Details anzeigen falls vorhanden
+                if (response.change_details && response.change_details.length > 0) {
+                    message += '<br><strong>Beispiel-Änderungen:</strong><br>';
+                    response.change_details.slice(0, 3).forEach(function(change) {
+                        message += '• ' + change.linie_neu + ': "' + change.old_linie_alt + '" → "' + change.new_linie_alt + '"<br>';
+                    });
+                    
+                    if (response.change_details.length > 3) {
+                        message += '• ... und ' + (response.change_details.length - 3) + ' weitere<br>';
+                    }
+                }
+                
+                $status.html('<span style="color: green;">' + message + '</span>');
+                
+                // Bei Änderungen automatisch Seite neu laden nach 3 Sekunden
+                if (response.updates_performed > 0) {
+                    setTimeout(function() {
+                        if (confirm('Es wurden ' + response.updates_performed + ' Fahrpläne aktualisiert.\n\nSeite neu laden um Änderungen zu sehen?')) {
+                            location.reload();
+                        }
+                    }, 3000);
+                } else {
+                    // Status nach 5 Sekunden ausblenden
+                    setTimeout(function() {
+                        $status.html('');
+                    }, 5000);
+                }
+            },
+            error: function(error) {
+                console.error('❌ FAHRPLANPORTAL: Mapping-DB-Abgleich fehlgeschlagen:', error);
+                
+                // Button zurücksetzen
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>Mapping Tabelle mit dB aktualisieren');
+                
+                // Fehler anzeigen
+                $status.html('<span style="color: red;">❌ Fehler beim DB-Abgleich: ' + (error.message || 'Unbekannter Fehler') + '</span>');
+                
+                // Fehler nach 8 Sekunden ausblenden
+                setTimeout(function() {
+                    $status.html('');
+                }, 8000);
+            }
+        });
+    });
     
     // Admin Linien-Mapping laden
     $('#load-line-mapping').on('click', function() {

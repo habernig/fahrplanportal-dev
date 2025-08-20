@@ -67,6 +67,7 @@ class FahrplanPortal_Ajax {
             'load_line_mapping' => array($this, 'unified_load_line_mapping'),
             'analyze_all_tags' => array($this, 'unified_analyze_all_tags'),
             'cleanup_existing_tags' => array($this, 'unified_cleanup_existing_tags'),
+            'update_mapping_in_db' => array($this, 'unified_update_mapping_in_db'),
         ));
         
         error_log('✅ FAHRPLANPORTAL: Admin Handler mit Tag-Analyse im Unified System registriert');
@@ -572,6 +573,149 @@ class FahrplanPortal_Ajax {
         }
         
         wp_send_json_success($response);
+    }
+
+
+    /**
+     * ✅ NEU: Mapping-Tabelle mit Datenbank abgleichen
+     * Aktualisiert alle bestehenden Fahrpläne mit neuen Mapping-Zuordnungen
+     * ohne PDF-Neuscan
+     */
+    public function unified_update_mapping_in_db() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Keine Berechtigung für DB-Abgleich');
+            return;
+        }
+        
+        error_log('FAHRPLANPORTAL: 🔄 Starte Mapping-DB-Abgleich');
+        
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'fahrplaene';
+        
+        // 1. Aktuelles Mapping laden und parsen
+        $mapping_array = $this->utils->get_line_mapping();
+
+        if (empty($mapping_array)) {
+            wp_send_json_error('Keine Mapping-Konfiguration gefunden oder Parsing fehlgeschlagen');
+            return;
+        }
+        
+        error_log("FAHRPLANPORTAL: ✅ " . count($mapping_array) . " Mapping-Einträge geladen");
+        
+        // 3. Alle Fahrpläne aus DB laden
+        $all_fahrplaene = $wpdb->get_results(
+            "SELECT id, titel, linie_neu, linie_alt FROM {$table_name} ORDER BY id ASC"
+        );
+        
+        if (empty($all_fahrplaene)) {
+            wp_send_json_error('Keine Fahrpläne in der Datenbank gefunden');
+            return;
+        }
+        
+        error_log("FAHRPLANPORTAL: 📊 " . count($all_fahrplaene) . " Fahrpläne zum Abgleich gefunden");
+        
+        // 4. Änderungen sammeln und durchführen
+        $updates_performed = 0;
+        $updates_failed = 0;
+        $no_mapping_found = 0;
+        $already_correct = 0;
+        $change_details = array();
+        
+        foreach ($all_fahrplaene as $fahrplan) {
+            $id = $fahrplan->id;
+            $titel = $fahrplan->titel;
+            $linie_neu = $fahrplan->linie_neu;
+            $current_linie_alt = $fahrplan->linie_alt;
+            
+            // Überspringe wenn linie_neu leer
+            if (empty($linie_neu)) {
+                continue;
+            }
+            
+            // 5. Neue linie_alt über Mapping ermitteln
+            $new_linie_alt = '';
+            
+            // Mehrere Linien in linie_neu? (kommagetrennt)
+            if (strpos($linie_neu, ',') !== false) {
+                $linie_neu_array = array_map('trim', explode(',', $linie_neu));
+                $alte_nummern = array();
+                
+                foreach ($linie_neu_array as $einzelne_linie) {
+                    $gemappte_alte = $this->utils->lookup_mapping($einzelne_linie, $mapping_array);
+                    
+                    if ($gemappte_alte !== null && strtolower($gemappte_alte) !== 'keine') {
+                        $alte_nummern[] = $gemappte_alte;
+                    }
+                }
+                
+                $new_linie_alt = implode(', ', $alte_nummern);
+            } 
+            // Einzelne Linie
+            else {
+                $gemappte_alte = $this->utils->lookup_mapping($linie_neu, $mapping_array);
+                
+                if ($gemappte_alte !== null && strtolower($gemappte_alte) !== 'keine') {
+                    $new_linie_alt = $gemappte_alte;
+                }
+            }
+            
+            // 6. Vergleich und Update
+            if (empty($new_linie_alt)) {
+                $no_mapping_found++;
+                error_log("FAHRPLANPORTAL: ⚠️ Kein Mapping für ID $id (linie_neu: '$linie_neu')");
+                continue;
+            }
+            
+            // Bereits korrekt?
+            if ($current_linie_alt === $new_linie_alt) {
+                $already_correct++;
+                continue;
+            }
+            
+            // Update durchführen
+            $update_result = $wpdb->update(
+                $table_name,
+                array('linie_alt' => $new_linie_alt),
+                array('id' => $id),
+                array('%s'),
+                array('%d')
+            );
+            
+            if ($update_result !== false) {
+                $updates_performed++;
+                $change_details[] = array(
+                    'id' => $id,
+                    'titel' => $titel,
+                    'linie_neu' => $linie_neu,
+                    'old_linie_alt' => $current_linie_alt,
+                    'new_linie_alt' => $new_linie_alt
+                );
+                
+                error_log("FAHRPLANPORTAL: ✅ Update ID $id: '$current_linie_alt' → '$new_linie_alt'");
+            } else {
+                $updates_failed++;
+                error_log("FAHRPLANPORTAL: ❌ Update fehlgeschlagen für ID $id");
+            }
+        }
+        
+        // 7. Ergebnis zusammenfassen
+        $summary = array(
+            'total_fahrplaene' => count($all_fahrplaene),
+            'updates_performed' => $updates_performed,
+            'updates_failed' => $updates_failed,
+            'no_mapping_found' => $no_mapping_found,
+            'already_correct' => $already_correct,
+            'mapping_entries' => count($mapping_array),
+            'change_details' => array_slice($change_details, 0, 10) // Nur erste 10 Details
+        );
+        
+        error_log("FAHRPLANPORTAL: 🎯 Mapping-DB-Abgleich abgeschlossen:");
+        error_log("FAHRPLANPORTAL:    Updates: $updates_performed");
+        error_log("FAHRPLANPORTAL:    Fehlgeschlagen: $updates_failed"); 
+        error_log("FAHRPLANPORTAL:    Kein Mapping: $no_mapping_found");
+        error_log("FAHRPLANPORTAL:    Bereits korrekt: $already_correct");
+        
+        wp_send_json_success($summary);
     }
     
     /**

@@ -316,11 +316,13 @@ class FahrplanPortal_Admin {
                         <div class="fahrplan-form-row">
                             <div class="fahrplan-form-group">
                                 <label for="edit-linie-alt">Linie Alt (4-stellig)</label>
+                                <small>Linien Mapping in der DB Wartung durchführen.</small>
                                 <input type="text" id="edit-linie-alt" name="linie_alt" readonly>
                             </div>
                             <div class="fahrplan-form-group">
                                 <label for="edit-linie-neu">Linie Neu (2-3 stellig)</label>
-                                <input type="text" id="edit-linie-neu" name="linie_neu">
+                                <small>Linien Mapping in der DB Wartung durchführen.</small>
+                                <input type="text" id="edit-linie-neu" name="linie_neu" readonly>
                             </div>
                         </div>
                         
@@ -531,14 +533,25 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                             <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
                             Linien-Mapping speichern
                         </button>
-                        <?php /* ?>
-                        <button type="button" id="load-line-mapping" class="button button-secondary">
+                        
+                        <!-- ✅ NEU: Mapping DB-Abgleich Button -->
+                        <button type="button" id="update-mapping-in-db" class="button button-secondary" 
+                                style="margin-left: 10px;">
                             <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
-                            Neu laden
+                            Mapping Tabelle mit dB aktualisieren
                         </button>
-                        <?php */ ?>
+                        
                         <span id="mapping-status" style="margin-left: 15px;"></span>
                     </p>
+                    
+                    <!-- ✅ NEU: Erklärung für den neuen Button -->
+                    <div style="background: #e8f4fd; border: 1px solid #0073aa; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                        <p style="margin: 0; font-size: 13px; color: #0073aa;">
+                            <span class="dashicons dashicons-info" style="vertical-align: middle; margin-right: 5px;"></span>
+                            <strong>Mapping DB-Abgleich:</strong> Aktualisiert alle bestehenden Fahrpläne in der Datenbank 
+                            mit den neuen Mapping-Zuordnungen, ohne die PDFs nochmals einzulesen.
+                        </p>
+                    </div>
                     
                     <details>
                         <summary style="cursor: pointer; font-weight: bold;">Beispiel-Mapping laden (Klicken zum Aufklappen)</summary>
