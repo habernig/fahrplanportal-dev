@@ -552,18 +552,6 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                             mit den neuen Mapping-Zuordnungen, ohne die PDFs nochmals einzulesen.
                         </p>
                     </div>
-                    
-                    <details>
-                        <summary style="cursor: pointer; font-weight: bold;">Beispiel-Mapping laden (Klicken zum Aufklappen)</summary>
-                        <p style="margin-top: 10px;">
-                            <button type="button" id="load-example-mapping" class="button button-secondary">
-                                ✅ Neue Format Beispiel-Zuordnungen hinzufügen
-                            </button>
-                            <small class="description" style="display: block; margin-top: 5px;">
-                                Fügt Beispiel-Zuordnungen im neuen Format hinzu: 100:5000, 101:5001, 102:5002, etc.
-                            </small>
-                        </p>
-                    </details>
                 </div>
             </div>
             
