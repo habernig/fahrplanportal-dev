@@ -684,15 +684,20 @@ class FahrplanPortal_Utils {
         return date('d.m.Y', $timestamp);
     }
     
+    /**
+     * ✅ KORRIGIERT: Zeigt ALLE Tags vollständig an
+     */
     public function format_tags_for_display($tags, $pdf_parsing_enabled = false) {
         if (!$pdf_parsing_enabled || empty($tags)) {
             return '';
         }
         
+        // Tags in Array umwandeln und bereinigen
         $tags_array = explode(',', $tags);
         $tags_array = array_map('trim', $tags_array);
-        $tags_array = array_slice($tags_array, 0, 5); // Zeige max 5 Tags
+        $tags_array = array_filter($tags_array); // Leere Einträge entfernen
         
-        return implode(', ', $tags_array) . (count(explode(',', $tags)) > 5 ? '...' : '');
+        // Alle Tags mit Komma getrennt zurückgeben
+        return implode(', ', $tags_array);
     }
 }
