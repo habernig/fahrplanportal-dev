@@ -173,11 +173,16 @@ class FahrplanPortal_Ajax {
             'imported' => 0,
             'skipped' => 0,
             'errors' => 0,
+            'processed' => 0,
+            'region_stats' => array(),  // NEU: Für Regionen-Statistik
             'files' => array()
         );
         
         foreach ($chunk_files as $file_info) {
             try {
+                
+                // Am Anfang jeder Datei-Verarbeitung
+                $chunk_stats['processed']++;
                 // Prüfen ob schon vorhanden
                 $existing = $this->database->fahrplan_exists($file_info['filename'], $file_info['folder'], $file_info['region']);
                 
@@ -217,6 +222,8 @@ class FahrplanPortal_Ajax {
                 error_log('FAHRPLANPORTAL: Fehler bei ' . $file_info['filename'] . ' - ' . $e->getMessage());
             }
         }
+
+        $chunk_stats['processed'] = $chunk_stats['imported'] + $chunk_stats['skipped'] + $chunk_stats['errors'];
         
         // Chunk-Ergebnis zurückgeben
         wp_send_json_success(array(
