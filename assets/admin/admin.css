@@ -1013,20 +1013,27 @@
 
 /* 10: Tags (nur wenn PDF-Parsing aktiv) */
 #fahrplaene-table td:nth-child(11) {
-    width: 200px !important;
+    width: 250px !important;
     min-width: 200px;
-    max-width: 200px;
+    max-width: 350px;
     text-align: left;
     vertical-align: top;
-    padding: 6px 4px;
+    padding: 8px;
     font-size: 11px;
     
-    /* Zeilenumbruch aktivieren */
+    /* Automatischer Zeilenumbruch für Tags */
     white-space: normal !important;
     word-wrap: break-word !important;
     word-break: break-word !important;
-    overflow-wrap: break-word !important;
-    line-height: 1.3;
+    overflow-wrap: anywhere !important;
+    hyphens: auto !important;
+    
+    /* Zeilenhöhe für bessere Lesbarkeit */
+    line-height: 1.4;
+    
+    /* Verhindert Überlauf */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Tags-Spalten-Header */
@@ -1034,6 +1041,67 @@
     width: 200px;
     min-width: 200px;
     text-align: center;
+}
+
+/* Optional: Hover-Effekt für Tags-Zelle für bessere Lesbarkeit */
+#fahrplaene-table td:nth-child(11):hover {
+    background-color: #f0f8ff;
+    cursor: help;
+    position: relative;
+    z-index: 1;
+}
+
+
+/* CSS für aufgeklappte/expandierte Tags-Zeile */
+#fahrplaene-table tr.expanded-row td,
+#fahrplaene-table tr td[colspan],
+#fahrplaene-table tr td[colspan="12"],
+#fahrplaene-table tr td[colspan="11"],
+#fahrplaene-table .tags-row td,
+#fahrplaene-table tr:has(.tags) td {
+    /* Zeilenumbruch für expandierte Tags */
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    
+    /* Maximale Breite und Padding */
+    max-width: 100% !important;
+    padding: 10px 20px !important;
+    
+    /* Zeilenhöhe */
+    line-height: 1.6 !important;
+}
+
+/* Spezifisch für Tags in der expandierten Zeile */
+#fahrplaene-table tr td[colspan] .tags,
+#fahrplaene-table tr.expanded-row .tags,
+#fahrplaene-table tr td.tags-cell {
+    display: block !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    max-width: calc(100vw - 100px) !important;
+    width: 100% !important;
+}
+
+/* Responsive: Bei kleinen Bildschirmen aggressiveres Breaking */
+@media (max-width: 1400px) {
+    #fahrplaene-table tr td[colspan],
+    #fahrplaene-table tr.expanded-row td {
+        word-break: break-all !important;
+        font-size: 11px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #fahrplaene-table tr td[colspan],
+    #fahrplaene-table tr.expanded-row td {
+        word-break: break-all !important;
+        font-size: 10px !important;
+        padding: 8px 10px !important;
+    }
 }
 
 /* 11: Aktionen (oder 10 wenn kein PDF-Parsing) */
