@@ -1,0 +1,365 @@
+/**
+ * Fahrplanportal Frontend CSS
+ * Externe CSS-Datei für das Fahrplanportal
+ * ✅ VERBESSERT: Mobile Download-Button Layout
+ */
+
+:root {
+    --fahrplanportal-primary: #007BC1;
+    --fahrplanportal-secondary: #6c757d;
+    --fahrplanportal-success: #198754;
+    --fahrplanportal-danger: #dc3545;
+    --fahrplanportal-light: #f8f9fa;
+    --fahrplanportal-border: #dee2e6;
+}
+
+.fahrplanportal-frontend {
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.fahrplanportal-filters {
+    background: var(--fahrplanportal-light);
+    border: 1px solid var(--fahrplanportal-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.fahrplanportal-filters .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.fahrplanportal-filters .form-select,
+.fahrplanportal-filters .form-control {
+    border: 2px solid var(--fahrplanportal-border);
+    border-radius: 6px;
+    padding: 0 1rem;
+    transition: all 0.2s ease;
+}
+
+.fahrplanportal-filters .form-select:focus,
+.fahrplanportal-filters .form-control:focus {
+    border-color: var(--fahrplanportal-primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 124, 186, 0.25);
+}
+
+.fahrplanportal-reset {
+    background-color: var(--fahrplanportal-danger);
+    border-color: var(--fahrplanportal-danger);
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.fahrplanportal-reset:hover {
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+    transform: translateY(-1px);
+}
+
+.fahrplanportal-empty-state,
+.fahrplanportal-no-results {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: white;
+    border: 2px dashed var(--fahrplanportal-border);
+    border-radius: 8px;
+}
+
+.empty-state-icon {
+    color: var(--fahrplanportal-secondary);
+    margin-bottom: 1rem;
+}
+
+.empty-state-icon svg {
+    opacity: 0.7;
+}
+
+/* Fahrplan Items */
+.fahrplanportal-item.card {
+    transition: all 0.2s ease;
+    background: #f9f9f9;
+    border-left: 4px solid var(--e-global-color-primary);
+    border-radius: 0 !important;
+    margin-bottom: 15px;
+    text-decoration: none !important;
+}
+
+.fahrplanportal-item.card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.fahrplanportal-item .card-body {
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 15px;
+}
+
+.fahrplanportal-item-content {
+    flex: 1;
+}
+
+/* ✅ NEU: Mobile Bottom Row (standardmäßig versteckt) */
+.fahrplanportal-mobile-bottom {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    gap: 15px;
+}
+
+/* Top Row Layout */
+.fahrplanportal-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.fahrplanportal-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.fahrplan-line-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 0.35em 0.65em;
+}
+
+.fahrplanportal-validity {
+    text-align: center;
+    color: var(--fahrplanportal-secondary);
+    font-weight: 500;
+    font-size: 0.85rem;
+    flex: 1;
+    min-width: 200px;
+}
+
+.fahrplanportal-region-desktop {
+    text-align: right;
+    color: var(--fahrplanportal-secondary);
+    font-weight: 500;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Mobile Region - nur auf Mobile sichtbar */
+.fahrplanportal-region-mobile {
+    color: var(--fahrplanportal-secondary);
+    font-weight: 500;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.fahrplanportal-title p {
+    font-weight: bold;
+    margin: 0 0 4px 0;
+    color: #212529;
+    font-size: 1.3rem;
+    line-height: 1.3;
+}
+
+.fahrplanportal-description p {
+    color: var(--fahrplanportal-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Download Button */
+.fahrplanportal-download,
+.fahrplanportal-download-mobile {
+    flex-shrink: 0;
+}
+
+.fahrplan-download-btn {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--fahrplanportal-primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    color: var(--fahrplanportal-primary);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.fahrplanportal-item:hover .fahrplan-download-btn {
+    background-color: var(--fahrplanportal-primary);
+    color: white;
+    transform: scale(1.1);
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--fahrplanportal-border);
+    padding-bottom: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.results-header h5 {
+    margin: 0;
+    color: #212529;
+}
+
+.badge.bg-primary {
+    background-color: var(--fahrplanportal-primary) !important;
+}
+
+.autocomplete-wrapper {
+    position: relative;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid var(--fahrplanportal-border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1050;
+    display: none;
+}
+
+.autocomplete-dropdown.show {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover {
+    background-color: var(--fahrplanportal-light);
+}
+
+.autocomplete-text {
+    font-weight: 600;
+    color: #212529;
+    font-size: 0.95rem;
+}
+
+.autocomplete-context {
+    font-size: 0.8rem;
+    color: var(--fahrplanportal-secondary);
+    font-style: italic;
+}
+
+.autocomplete-loading {
+    padding: 1rem;
+    text-align: center;
+    color: var(--fahrplanportal-secondary);
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .fahrplanportal-filters {
+        padding: 1rem;
+    }
+    
+    /* ✅ VERBESSERT: Mobile Card Layout */
+    .fahrplanportal-item .card-body {
+        flex-direction: column;
+        gap: 0;
+        align-items: stretch;
+    }
+    
+    /* ✅ NEU: Mobile Bottom Row anzeigen */
+    .fahrplanportal-mobile-bottom {
+        display: flex !important;
+    }
+    
+    /* ✅ VERBESSERT: Mobile Layout für Top Row */
+    .fahrplanportal-top-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    /* Badges bleiben linksbündig */
+    .fahrplanportal-badges {
+        flex: 0 0 auto;
+        order: 1;
+    }
+    
+    /* Validity wird rechtsbündig und nimmt verfügbaren Platz */
+    .fahrplanportal-validity {
+        flex: 1 1 auto;
+        text-align: right !important;
+        min-width: auto;
+        order: 2;
+    }
+
+    .fahrplanportal-title p {
+        font-weight: bold;
+        margin: 0 0 2px 0;
+        color: #212529;
+        font-size: 1.1rem;
+        line-height: 1.3;
+    }
+    
+    /* ✅ GEÄNDERT: Desktop Region auf Mobile verstecken */
+    .fahrplanportal-region-desktop {
+        display: none !important;
+    }
+    
+    /* ✅ NEU: Desktop Download Button auf Mobile verstecken */
+    .fahrplanportal-download-desktop {
+        display: none !important;
+    }
+}
+
+/* Desktop - Mobile Elemente ausblenden */
+@media (min-width: 769px) {
+    .fahrplanportal-region-mobile {
+        display: none !important;
+    }
+    
+    .fahrplanportal-mobile-bottom {
+        display: none !important;
+    }
+    
+    .fahrplanportal-download-mobile {
+        display: none !important;
+    }
+    
+    .fahrplanportal-region-desktop {
+        display: flex !important;
+    }
+}
