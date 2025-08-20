@@ -350,4 +350,71 @@ class FahrplanPortal_Database {
     public function get_table_name() {
         return $this->table_name;
     }
+
+
+    /**
+     * ✅ NEU: Alle Fahrpläne mit Tags laden (Performance-optimiert)
+     * Lädt nur ID und Tags-Spalte für Tag-Bereinigung
+     */
+    public function get_all_fahrplaene_with_tags() {
+        global $wpdb;
+        
+        // Nur ausführen wenn PDF-Parsing verfügbar
+        if (!$this->pdf_parsing_enabled) {
+            return array();
+        }
+        
+        return $wpdb->get_results(
+            "SELECT id, tags FROM {$this->table_name} 
+             WHERE tags IS NOT NULL AND tags != '' 
+             ORDER BY id ASC"
+        );
+    }
+
+    /**
+     * ✅ NEU: Tags für spezifischen Fahrplan aktualisieren
+     * Performance-optimiert: Updated nur Tags-Spalte
+     */
+    public function update_fahrplan_tags($id, $tags) {
+        global $wpdb;
+        
+        // Nur ausführen wenn PDF-Parsing verfügbar
+        if (!$this->pdf_parsing_enabled) {
+            return false;
+        }
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            array('tags' => $tags),
+            array('id' => $id),
+            array('%s'),
+            array('%d')
+        );
+        
+        if ($result === false) {
+            error_log("FAHRPLANPORTAL: Fehler beim Tag-Update für ID $id: " . $wpdb->last_error);
+            return false;
+        }
+        
+        return $result;
+    }
+
+    /**
+     * ✅ NEU: Statistiken für Tag-Bereinigung
+     * Zählt Fahrpläne mit Tags für Progress-Anzeige
+     */
+    public function get_fahrplaene_with_tags_count() {
+        global $wpdb;
+        
+        // Nur ausführen wenn PDF-Parsing verfügbar
+        if (!$this->pdf_parsing_enabled) {
+            return 0;
+        }
+        
+        return $wpdb->get_var(
+            "SELECT COUNT(*) FROM {$this->table_name} 
+             WHERE tags IS NOT NULL AND tags != ''"
+        );
+    }
+
 }

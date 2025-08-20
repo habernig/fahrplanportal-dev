@@ -394,7 +394,7 @@ class FahrplanPortal_Admin {
                 <h3>PDF-Parsing Exklusionsliste</h3>
                 <p class="description">
                     Hier können Sie Wörter definieren, die beim PDF-Parsing aus den Tags entfernt werden sollen. 
-                    Trennen Sie die Wörter durch Leerzeichen, Kommas oder Zeilenumbrüche.
+                    Trennen Sie die Wörter durch ein Komma.
                     <br><strong>Aktuell:</strong> <?php echo $word_count; ?> Wörter in der Exklusionsliste.
                 </p>
                 
@@ -412,26 +412,89 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                             <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
                             Exklusionsliste speichern
                         </button>
+                        <?php /* ?>
                         <button type="button" id="load-exclusion-words" class="button button-secondary">
                             <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
                             Neu laden
                         </button>
+                        <?php */ ?>
                         <span id="exclusion-status" style="margin-left: 15px;"></span>
                     </p>
                     
-                    <details>
-                        <summary style="cursor: pointer; font-weight: bold;">Standard-Exklusionsliste laden (Klicken zum Aufklappen)</summary>
-                        <p style="margin-top: 10px;">
-                            <button type="button" id="load-default-exclusions" class="button button-secondary">
-                                Standard-Deutsche-Stoppwörter hinzufügen
-                            </button>
-                            <small class="description" style="display: block; margin-top: 5px;">
-                                Fügt häufige deutsche Wörter zur Exklusionsliste hinzu (aber, der, die, das, etc.)
-                            </small>
-                        </p>
+                </div>
+            </div>
+
+            <?php if ($this->pdf_parsing_enabled): ?>
+            <hr style="margin: 30px 0;">
+
+            <!-- ✅ NEU: TAG-BEREINIGUNG SEKTION -->
+            <div class="tag-cleanup-management">
+                <h3>🧹 Tag-Bereinigung in Datenbank</h3>
+                <p class="description">
+                    Entfernt alle Exklusionswörter aus bereits gespeicherten Tags in der Datenbank.
+                    <br><strong>Anwendung:</strong> Nach Änderungen an der Exklusionsliste ausführen, um bestehende Daten zu bereinigen.
+                    <br><strong>Achtung:</strong> Diese Änderungen sind nicht rückgängig zu machen!
+                </p>
+                
+                <div class="tag-cleanup-form">
+                    <p>
+                        <button type="button" id="cleanup-existing-tags" class="button button-primary" style="
+                            background: linear-gradient(135deg, #e67e22 0%, #d68910 100%);
+                            border-color: #d68910;
+                            color: white;
+                            font-weight: 600;
+                            padding: 8px 16px;
+                            box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
+                            transition: all 0.2s ease;
+                        ">
+                            <span class="dashicons dashicons-admin-tools" style="vertical-align: middle; margin-right: 5px;"></span>
+                            Bestehende Tags bereinigen
+                        </button>
+                        <span id="cleanup-status" style="margin-left: 15px;"></span>
+                    </p>
+                    
+                    <details style="margin-top: 15px;">
+                        <summary style="cursor: pointer; font-weight: bold; color: #0073aa;">
+                            ℹ️ Was macht diese Funktion? (Klicken zum Aufklappen)
+                        </summary>
+                        <div style="
+                            background: #f8f9fa;
+                            border: 2px solid #dee2e6;
+                            border-radius: 8px;
+                            padding: 15px;
+                            margin-top: 10px;
+                            font-size: 13px;
+                            line-height: 1.5;
+                        ">
+                            <h4 style="margin: 0 0 10px 0; color: #495057;">Funktionsweise:</h4>
+                            <ol style="margin: 0 0 15px 0; padding-left: 20px;">
+                                <li><strong>Lädt alle Fahrpläne mit Tags</strong> aus der Datenbank</li>
+                                <li><strong>Prüft jeden Tag</strong> gegen die aktuelle Exklusionsliste</li>
+                                <li><strong>Entfernt alle Wörter</strong> die in der Exklusionsliste stehen</li>
+                                <li><strong>Speichert bereinigte Tags</strong> zurück in die Datenbank</li>
+                            </ol>
+                            
+                            <h4 style="margin: 0 0 10px 0; color: #495057;">Beispiel-Szenario:</h4>
+                            <div style="background: white; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                                <strong>Vorher:</strong> "klagenfurt, bus, station, montag, verkehr"<br>
+                                <strong>Nachher:</strong> "klagenfurt" (wenn "bus, station, montag, verkehr" in Exklusionsliste)
+                            </div>
+                            
+                            <div style="
+                                background: #fff3cd;
+                                border: 1px solid #ffeaa7;
+                                border-radius: 4px;
+                                padding: 10px;
+                                color: #856404;
+                            ">
+                                <strong>💡 Tipp:</strong> Führen Sie diese Funktion aus, nachdem Sie Ihre 
+                                Exklusionsliste erweitert haben, um auch ältere Fahrpläne zu bereinigen.
+                            </div>
+                        </div>
                     </details>
                 </div>
             </div>
+            <?php endif; ?>
             
             <hr style="margin: 30px 0;">
             <?php endif; ?>
@@ -439,16 +502,10 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
             <!-- ✅ GEÄNDERT: SEKTION: Linien-Mapping mit neuer Erklärung -->
             <div class="line-mapping-management">
                 <h3>🔄 Linien-Mapping (Neu → Alt) - NEUE NUMMERNLOGIK</h3>
-                <div class="notice notice-info" style="margin: 10px 0;">
-                    <p><strong>⚠️ WICHTIGE ÄNDERUNG:</strong> Das Mapping-Format wurde umgestellt!</p>
-                    <p><strong>NEUES FORMAT:</strong> <code>neue_nummer:alte_nummer</code> (z.B. <code>100:5000</code>)</p>
-                    <p><strong>Bedeutung:</strong> Neue 2-3 stellige Nummer <code>100</code> wird zur alten 4-stelligen Nummer <code>5000</code> zugeordnet</p>
-                </div>
+                
                 <p class="description">
-                    Das System erkennt jetzt 2-3 stellige Fahrplannummern (561, 82) als neue Hauptnummern und ordnet ihnen über diese Mapping-Tabelle die alten 4-stelligen Nummern zu.
+                    Das System erkennt 2-3 stellige Fahrplannummern (561, 82) als neue Hauptnummern und ordnet diese über eine Mapping-Tabelle den alten 4-stelligen Nummern zu.
                     <br><strong>Format:</strong> Eine Zuordnung pro Zeile im Format <code>neue_nummer:alte_nummer</code>
-                    <br><strong>Beispiel:</strong> <code>100:5000</code> bedeutet: PDF mit neuer Nummer 100 wird auch die alte Nummer 5000 zugeordnet
-                    <br><strong>Import-Logik:</strong> PDFs wie <code>100-feldkirchen-villach.pdf</code> bekommen automatisch beide Nummern (100 + 5000)
                     <br><strong>Aktuell:</strong> <?php echo $mapping_count; ?> Zuordnungen in der Mapping-Liste.
                 </p>
                 
@@ -474,10 +531,12 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                             <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
                             Linien-Mapping speichern
                         </button>
+                        <?php /* ?>
                         <button type="button" id="load-line-mapping" class="button button-secondary">
                             <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
                             Neu laden
                         </button>
+                        <?php */ ?>
                         <span id="mapping-status" style="margin-left: 15px;"></span>
                     </p>
                     
@@ -494,6 +553,8 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                     </details>
                 </div>
             </div>
+            
+            
             
             <hr style="margin: 30px 0;">
             

@@ -65,9 +65,8 @@ class FahrplanPortal_Ajax {
             'load_exclusion_words' => array($this, 'unified_load_exclusion_words'),
             'save_line_mapping' => array($this, 'unified_save_line_mapping'),
             'load_line_mapping' => array($this, 'unified_load_line_mapping'),
-            
-            // ✅ NEU: Tag-Analyse Action hinzufügen
             'analyze_all_tags' => array($this, 'unified_analyze_all_tags'),
+            'cleanup_existing_tags' => array($this, 'unified_cleanup_existing_tags'),
         ));
         
         error_log('✅ FAHRPLANPORTAL: Admin Handler mit Tag-Analyse im Unified System registriert');
@@ -790,4 +789,132 @@ class FahrplanPortal_Ajax {
             wp_send_json_error('Fehler bei der Tag-Analyse: ' . $e->getMessage());
         }
     }
+
+    /**
+     * ✅ NEU: Bestehende Tags in Datenbank bereinigen
+     * Entfernt Exklusionswörter aus allen bereits gespeicherten Tags
+     */
+    public function unified_cleanup_existing_tags() {
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        // PDF-Parsing verfügbar prüfen
+        if (!$this->pdf_parsing_enabled) {
+            wp_send_json_error('PDF-Parsing nicht verfügbar - Tag-Bereinigung nicht möglich');
+            return;
+        }
+        
+        $start_time = microtime(true);
+        
+        try {
+            // ✅ Schritt 1: Exklusionsliste laden
+            $exclusion_words = $this->utils->get_exclusion_words();
+            
+            if (empty($exclusion_words)) {
+                wp_send_json_error('Exklusionsliste ist leer - nichts zu bereinigen');
+                return;
+            }
+            
+            error_log('FAHRPLANPORTAL: Tag-Cleanup gestartet mit ' . count($exclusion_words) . ' Exklusionswörtern');
+            
+            // ✅ Schritt 2: Alle Fahrpläne mit Tags laden
+            $fahrplaene_with_tags = $this->database->get_all_fahrplaene_with_tags();
+            
+            if (empty($fahrplaene_with_tags)) {
+                wp_send_json_success(array(
+                    'message' => 'Keine Fahrpläne mit Tags gefunden',
+                    'updated_fahrplaene' => 0,
+                    'removed_words' => 0,
+                    'exclusion_count' => count($exclusion_words),
+                    'processing_time' => round(microtime(true) - $start_time, 2)
+                ));
+                return;
+            }
+            
+            error_log('FAHRPLANPORTAL: ' . count($fahrplaene_with_tags) . ' Fahrpläne mit Tags gefunden');
+            
+            // ✅ Schritt 3: Tags bereinigen
+            $updated_count = 0;
+            $removed_words_total = 0;
+            $batch_size = 50; // Batches für Performance
+            $processed = 0;
+            
+            foreach ($fahrplaene_with_tags as $fahrplan) {
+                if (empty($fahrplan->tags)) {
+                    continue;
+                }
+                
+                // Tags parsen (kommagetrennt)
+                $original_tags = explode(',', $fahrplan->tags);
+                $clean_tags = array();
+                $removed_words_this_fahrplan = 0;
+                
+                foreach ($original_tags as $tag) {
+                    $tag = trim(mb_strtolower($tag, 'UTF-8'));
+                    
+                    if (empty($tag)) {
+                        continue;
+                    }
+                    
+                    // Prüfen ob Tag NICHT in Exklusionsliste
+                    if (!isset($exclusion_words[$tag])) {
+                        $clean_tags[] = $tag;
+                    } else {
+                        $removed_words_this_fahrplan++;
+                        $removed_words_total++;
+                    }
+                }
+                
+                // Bereinigte Tags zusammenführen
+                $new_tags = implode(', ', $clean_tags);
+                
+                // Nur updaten wenn sich was geändert hat
+                if ($new_tags !== $fahrplan->tags) {
+                    $update_result = $this->database->update_fahrplan_tags($fahrplan->id, $new_tags);
+                    
+                    if ($update_result !== false) {
+                        $updated_count++;
+                        
+                        // Debug-Log für erste paar Updates
+                        if ($updated_count <= 3) {
+                            error_log("FAHRPLANPORTAL: ID {$fahrplan->id} - {$removed_words_this_fahrplan} Wörter entfernt");
+                        }
+                    } else {
+                        error_log("FAHRPLANPORTAL: Update-Fehler für ID {$fahrplan->id}");
+                    }
+                }
+                
+                $processed++;
+                
+                // Batch-Processing: Kurze Pause alle 50 Einträge
+                if ($processed % $batch_size === 0) {
+                    // Micro-Pause für Server-Performance
+                    usleep(1000); // 1ms
+                }
+            }
+            
+            $processing_time = round(microtime(true) - $start_time, 2);
+            
+            error_log("FAHRPLANPORTAL: Tag-Cleanup abgeschlossen - {$updated_count} Updates, {$removed_words_total} Wörter entfernt, {$processing_time}s");
+            
+            // ✅ Schritt 4: Erfolgs-Response mit Statistiken
+            wp_send_json_success(array(
+                'message' => "Tag-Bereinigung erfolgreich abgeschlossen",
+                'updated_fahrplaene' => $updated_count,
+                'removed_words' => $removed_words_total,
+                'total_fahrplaene' => count($fahrplaene_with_tags),
+                'exclusion_count' => count($exclusion_words),
+                'processing_time' => $processing_time,
+                'efficiency' => $updated_count > 0 ? 
+                    round(($removed_words_total / $updated_count), 1) : 0 // Durchschnitt Wörter pro Update
+            ));
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: Tag-Cleanup Exception: ' . $e->getMessage());
+            wp_send_json_error('Fehler bei Tag-Bereinigung: ' . $e->getMessage());
+        }
+    }
+
 }

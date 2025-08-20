@@ -186,6 +186,108 @@ function initializeFahrplanportalAdmin() {
         currentChunkErrors: []     // Fehler des aktuellen Chunks
     };
 
+
+    // ✅ NEU: Tag-Cleanup in bestehender Datenbank
+    $('#cleanup-existing-tags').on('click', function() {
+        var $btn = $(this);
+        var $status = $('#cleanup-status');
+        
+        // Sicherheitsabfrage
+        var confirmed = confirm(
+            '🧹 Tag-Bereinigung starten?\n\n' +
+            'Diese Funktion entfernt alle Exklusionswörter aus den bereits gespeicherten Tags in der Datenbank.\n\n' +
+            '⚠️ Wichtig: Stellen Sie sicher, dass Ihre Exklusionsliste aktuell ist.\n' +
+            'Die Änderungen sind nicht rückgängig zu machen!\n\n' +
+            'Fortfahren?'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+        
+        // UI für Loading-State vorbereiten
+        $btn.prop('disabled', true);
+        $status.html('<span style="color: orange;">🔄 Bereinige Tags in Datenbank...</span>');
+        
+        // Detaillierte Progress-Anzeige
+        var startTime = Date.now();
+        var progressInterval = setInterval(function() {
+            var elapsed = Math.round((Date.now() - startTime) / 1000);
+            $status.html('<span style="color: orange;">🔄 Bereinige Tags... (' + elapsed + 's)</span>');
+        }, 1000);
+        
+        // AJAX-Call zur Tag-Bereinigung
+        fahrplanAdminCall('cleanup_existing_tags', {}, {
+            success: function(response) {
+                clearInterval(progressInterval);
+                
+                // Detaillierte Erfolgs-Statistiken anzeigen
+                var stats = response;
+                var message = '';
+                
+                if (stats.updated_fahrplaene === 0) {
+                    message = '✅ Keine Bereinigung nötig - alle Tags sind bereits sauber!';
+                } else {
+                    message = '✅ Tag-Bereinigung erfolgreich abgeschlossen!\n\n';
+                    message += '📊 Statistiken:\n';
+                    message += '• ' + stats.updated_fahrplaene + ' Fahrpläne aktualisiert\n';
+                    message += '• ' + stats.removed_words + ' Wörter entfernt\n';
+                    message += '• ' + stats.total_fahrplaene + ' Fahrpläne insgesamt geprüft\n';
+                    message += '• ' + stats.exclusion_count + ' Wörter in Exklusionsliste\n';
+                    
+                    if (stats.efficiency) {
+                        message += '• ⌀ ' + stats.efficiency + ' Wörter pro Fahrplan entfernt\n';
+                    }
+                    
+                    message += '• ⏱️ Verarbeitungszeit: ' + stats.processing_time + 's';
+                }
+                
+                // Status-Anzeige aktualisieren
+                $status.html('<span style="color: green;">' + 
+                    stats.updated_fahrplaene + ' Fahrpläne bereinigt, ' + 
+                    stats.removed_words + ' Wörter entfernt (' + 
+                    stats.processing_time + 's)</span>');
+                
+                // Alert mit Details
+                alert(message);
+                
+                // Status nach 5 Sekunden ausblenden
+                setTimeout(function() {
+                    $status.html('');
+                }, 5000);
+                
+                console.log('✅ FAHRPLANPORTAL: Tag-Cleanup abgeschlossen', stats);
+            },
+            error: function(error) {
+                clearInterval(progressInterval);
+                
+                var errorMsg = error.message || 'Unbekannter Fehler';
+                $status.html('<span style="color: red;">✗ Fehler: ' + errorMsg + '</span>');
+                
+                // Detaillierte Fehlermeldung
+                alert('❌ Fehler bei Tag-Bereinigung:\n\n' + errorMsg + '\n\nBitte prüfen Sie:\n' +
+                      '• Ist die Exklusionsliste gespeichert?\n' +
+                      '• Ist PDF-Parsing aktiviert?\n' +
+                      '• Haben Sie die nötigen Berechtigungen?');
+                
+                console.error('❌ FAHRPLANPORTAL: Tag-Cleanup Fehler:', error);
+            },
+            complete: function() {
+                clearInterval(progressInterval);
+                $btn.prop('disabled', false);
+            }
+        });
+    });
+
+    // ✅ NEU: Hilfs-Tooltip für Tag-Cleanup Button
+    $('#cleanup-existing-tags').on('mouseenter', function() {
+        $(this).attr('title', 
+            'Entfernt alle Exklusionswörter aus bereits gespeicherten Tags in der Datenbank. ' +
+            'Nützlich nach Änderungen an der Exklusionsliste.'
+        );
+    });
+
+
     /**
      * ✅ SICHERER START: Fehlersammlung initialisieren
      */
@@ -605,6 +707,8 @@ function initializeFahrplanportalAdmin() {
             completeScan();
             return;
         }
+
+
         
         // ✅ SICHERHEIT: Fehlersammlung vor jedem Chunk prüfen
         initializeErrorCollection();
