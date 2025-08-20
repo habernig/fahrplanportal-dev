@@ -1290,8 +1290,9 @@ function initializeFahrplanportalAdmin() {
         });
     }
     
+    
     // ========================================
-    // ✅ TAG-ANALYSE EVENT-HANDLER
+    // ✅ TAG-ANALYSE EVENT-HANDLER (GEFIXT)
     // ========================================
     $('#analyze-all-tags').on('click', function() {
         var $btn = $(this);
@@ -1319,17 +1320,19 @@ function initializeFahrplanportalAdmin() {
                     'Alle Tags analysieren'
                 );
                 
-                // ✅ WICHTIG: Korrekte Response-Struktur für displayTagAnalysisResults
-                var analysisData = {
-                    data: response  // response enthält bereits die Daten direkt
-                };
+                // ✅ GEFIXT: Response ist bereits im korrekten Format
+                if (!response || (!response.statistics && !response.analysis)) {
+                    console.error('❌ FAHRPLANPORTAL: Ungültige Response-Struktur:', response);
+                    $status.html('<span style="color: red;">❌ Fehler: Ungültige Datenstruktur</span>');
+                    return;
+                }
                 
                 // Erfolgs-Status anzeigen
-                var totalTags = (response && response.statistics && response.statistics.total_unique_tags) || 0;
+                var totalTags = (response.statistics && response.statistics.total_unique_tags) || 0;
                 $status.html('<span style="color: green;">✅ Analyse abgeschlossen (' + totalTags + ' eindeutige Tags)</span>');
                 
-                // Ergebnisse anzeigen
-                displayTagAnalysisResults(analysisData);
+                // ✅ GEFIXT: Direkt response übergeben, NICHT in data wrappen
+                displayTagAnalysisResults({ data: response });
                 
                 // Nach 5 Sekunden Status leeren
                 setTimeout(function() {
@@ -1947,8 +1950,9 @@ function initializeFahrplanportalAdmin() {
     
     console.log('✅ FAHRPLANPORTAL: Admin-Interface vollständig initialisiert (Chunked Scanning mit DB-Bereinigung + Linie NEU editierbar)');
 
+
     /**
-     * ✅ HAUPTFUNKTION: Tag-Analyse Ergebnisse anzeigen (GEFIXT)
+     * ✅ HAUPTFUNKTION: Tag-Analyse Ergebnisse anzeigen (KOMPLETT GEFIXT)
      */
     function displayTagAnalysisResults(response) {
         console.log('📊 FAHRPLANPORTAL: Zeige Tag-Analyse Ergebnisse an:', response);
@@ -1961,7 +1965,7 @@ function initializeFahrplanportalAdmin() {
         
         var data = response.data;
         
-        // ✅ GEFIXT: Sichere Navigation zur statistics
+        // ✅ GEFIXT: Sichere Navigation zur statistics und analysis
         var stats = data.statistics || {};
         var analysis = data.analysis || {};
         
@@ -2011,36 +2015,43 @@ function initializeFahrplanportalAdmin() {
         `;
         $('#tag-stats-content').html(statsHtml);
         
-        // ✅ Bereits ausgeschlossene Tags (GRÜN) - mit sicherer Array-Prüfung
+        // ✅ Bereits ausgeschlossene Tags (GRÜN) - aus analysis.excluded_tags
         var excludedHtml = '';
-        var excludedTags = data.excluded_tags || [];
+        var excludedTags = analysis.excluded_tags || [];
+        var excludedTagsTotal = analysis.excluded_tags_total || excludedTags.length;
         
-        // ✅ NEUE VERSION (einfache Komma-Liste)
         if (excludedTags && excludedTags.length > 0) {
-            // Einfache kommagetrennte Liste ohne Design
-            excludedHtml = excludedTags.map(function(tag) {
-                return escapeHtml(tag);
-            }).join(', ');
-        } else {
+            // Einfache kommagetrennte Liste
+            excludedHtml = '<div style="padding: 5px; line-height: 1.6; word-wrap: break-word;">' + 
+                excludedTags.map(function(tag) {
+                    return escapeHtml(tag);
+                }).join(', ') + '</div>';
+        } else if (excludedTagsTotal === 0) {
             excludedHtml = '<div style="text-align: center; color: #666; font-style: italic;">Keine Tags in der Exklusionsliste gefunden</div>';
         }
         $('#excluded-tags-list').html(excludedHtml);
-        $('#excluded-tags-count').text(excludedTags.length);
+        $('#excluded-tags-count').text(excludedTagsTotal);
         
-        // ✅ Noch nicht ausgeschlossene Tags (ROT) - mit sicherer Array-Prüfung
+        // ✅ Noch nicht ausgeschlossene Tags (ROT) - aus analysis.not_excluded_tags
         var notExcludedHtml = '';
-        var notExcludedTags = data.not_excluded_tags || [];
+        var notExcludedTags = analysis.not_excluded_tags || [];
+        var notExcludedTagsTotal = analysis.not_excluded_tags_total || notExcludedTags.length;
         
         if (notExcludedTags && notExcludedTags.length > 0) {
-            // Einfache kommagetrennte Liste ohne Design
-            notExcludedHtml = notExcludedTags.map(function(tag) {
-                return escapeHtml(tag);
-            }).join(', ');
-        } else {
+            // Einfache kommagetrennte Liste
+            notExcludedHtml = '<div style="padding: 5px; line-height: 1.6; word-wrap: break-word;">' + 
+                notExcludedTags.map(function(tag) {
+                    return escapeHtml(tag);
+                }).join(', ') + '</div>';
+        } else if (notExcludedTagsTotal === 0) {
             notExcludedHtml = '<div style="text-align: center; color: #666; font-style: italic;">Alle Tags sind bereits ausgeschlossen! 🎉</div>';
         }
         $('#not-excluded-tags-list').html(notExcludedHtml);
-        $('#not-excluded-tags-count').text(notExcludedTags.length);
+        $('#not-excluded-tags-count').text(notExcludedTagsTotal);
+        
+        // ✅ Variablen für Event-Handler verfügbar machen
+        var _notExcludedTags = notExcludedTags;
+        var _notExcludedTagsTotal = notExcludedTagsTotal;
         
         // ✅ Zusätzliche Analysen vorbereiten (mit sicherer Prüfung)
         if (analysis && analysis.top_frequent_tags) {
@@ -2057,14 +2068,14 @@ function initializeFahrplanportalAdmin() {
             // Kurze Tags
             var shortTags = analysis.short_tags || [];
             var shortHtml = shortTags.length > 0 ? 
-                shortTags.map(tag => escapeHtml(tag)).join(', ') : 
+                shortTags.map(tag => '<code>' + escapeHtml(tag) + '</code>').join(', ') : 
                 'Keine kurzen Tags gefunden';
             $('#short-tags-list').html(shortHtml);
             
             // Lange Tags  
             var longTags = analysis.long_tags || [];
             var longHtml = longTags.length > 0 ? 
-                longTags.map(tag => escapeHtml(tag)).join(', ') : 
+                longTags.map(tag => '<code>' + escapeHtml(tag) + '</code>').join(', ') : 
                 'Keine langen Tags gefunden';
             $('#long-tags-list').html(longHtml);
             
@@ -2083,69 +2094,61 @@ function initializeFahrplanportalAdmin() {
         
         // ✅ Event-Handler für Aktions-Buttons
         $('#copy-red-tags').off('click').on('click', function() {
-            if (notExcludedTags && notExcludedTags.length > 0) {
-                var tagsText = notExcludedTags.join(' ');
+            // Nutze ALLE angezeigten Tags für die Kopier-Funktion
+            if (_notExcludedTags && _notExcludedTags.length > 0) {
+                // Für Kopieren nutzen wir Leerzeichen statt Komma als Trenner
+                var tagsText = _notExcludedTags.join(', ');
                 
                 // Versuche in Zwischenablage zu kopieren
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(tagsText).then(function() {
-                        alert('✅ ' + notExcludedTags.length + ' rote Tags in Zwischenablage kopiert!\n\nSie können diese nun in die Exklusionsliste einfügen.');
+                        var message = '✅ ' + _notExcludedTags.length + ' rote Tags in Zwischenablage kopiert!';
+                        message += '\n\nSie können diese nun in die Exklusionsliste einfügen.';
+                        alert(message);
                     }).catch(function(err) {
                         // Fallback
-                        promptCopyText(tagsText, notExcludedTags.length);
+                        promptCopyText(tagsText, _notExcludedTags.length, _notExcludedTagsTotal);
                     });
                 } else {
                     // Fallback für ältere Browser
-                    promptCopyText(tagsText, notExcludedTags.length);
+                    promptCopyText(tagsText, _notExcludedTags.length, _notExcludedTagsTotal);
                 }
             } else {
                 alert('🎉 Keine roten Tags zum Kopieren - alle Tags sind bereits ausgeschlossen!');
             }
         });
         
-        $('#goto-exclusion-list').off('click').on('click', function() {
-            // Scrolle zur Exklusionsliste
-            $('html, body').animate({
-                scrollTop: $('#exclusion-words').offset().top - 100
-            }, 1000);
-            
-            // Fokus setzen
-            setTimeout(function() {
-                $('#exclusion-words').focus();
-            }, 1100);
-        });
-        
-        console.log('✅ FAHRPLANPORTAL: Tag-Analyse Ergebnisse erfolgreich angezeigt');
+        console.log('✅ FAHRPLANPORTAL: Tag-Analyse Ergebnisse vollständig angezeigt');
     }
 
-    /**
-     * ✅ HILFSFUNKTION: HTML escapen
-     */
+    // Helper-Funktion für HTML-Escaping
     function escapeHtml(text) {
-        var div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        var map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
-    /**
-     * ✅ HILFSFUNKTION: Text zum Kopieren anzeigen (Fallback)
-     */
-    function promptCopyText(text, count) {
-        var message = '📋 Kopieren Sie diese ' + count + ' roten Tags:\n\n' + text + '\n\n(Text ist bereits markiert - Strg+C zum Kopieren)';
-        
-        // Erstelle temporäres Textfeld
-        var textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        alert(message);
-        
-        document.body.removeChild(textArea);
+    // Fallback für Kopieren in Zwischenablage
+    function promptCopyText(text, count, totalCount) {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            var message = '✅ ' + count + ' rote Tags in Zwischenablage kopiert!';
+            alert(message);
+        } catch (err) {
+            prompt('Bitte manuell kopieren (Strg+C):', text);
+        }
+        document.body.removeChild(textarea);
     }
 
 }

@@ -638,8 +638,10 @@ class FahrplanPortal_Ajax {
         ));
     }
     
+
     /**
      * ✅ NEU: Alle Tags aus der Datenbank analysieren
+     * GEFIXT: Verarbeitet und sendet ALLE Tags, nicht nur Top 100
      */
     public function unified_analyze_all_tags() {
         if (!current_user_can('manage_options')) {
@@ -654,15 +656,33 @@ class FahrplanPortal_Ajax {
             $tag_rows = $this->database->get_all_tags();
             
             if (empty($tag_rows)) {
+                // Leere Response mit erwarteter Struktur
                 wp_send_json_success(array(
                     'message' => 'Keine Tags in der Datenbank gefunden',
-                    'total_fahrplaene' => 0,
-                    'total_unique_tags' => 0,
-                    'excluded_tags' => array(),
-                    'not_excluded_tags' => array()
+                    'statistics' => array(
+                        'total_fahrplaene' => 0,
+                        'total_tags' => 0,
+                        'total_unique_tags' => 0,
+                        'excluded_count' => 0,
+                        'not_excluded_count' => 0,
+                        'exclusion_percentage' => 0,
+                        'exclusion_list_size' => 0
+                    ),
+                    'analysis' => array(
+                        'excluded_tags' => array(),
+                        'not_excluded_tags' => array(),
+                        'excluded_tags_total' => 0,
+                        'not_excluded_tags_total' => 0,
+                        'top_frequent_tags' => array(),
+                        'short_tags' => array(),
+                        'long_tags' => array()
+                    ),
+                    'processing_time' => 0
                 ));
                 return;
             }
+            
+            $start_time = microtime(true);
             
             error_log('FAHRPLANPORTAL: Gefundene Fahrpläne mit Tags: ' . count($tag_rows));
             
@@ -700,42 +720,69 @@ class FahrplanPortal_Ajax {
             $exclusion_words = $this->utils->get_exclusion_words();
             error_log('FAHRPLANPORTAL: Exklusionsliste geladen: ' . count($exclusion_words) . ' Wörter');
             
-            // ✅ Schritt 4: Tags analysieren
+            // ✅ Schritt 4: ALLE Tags kategorisieren (nicht nur Top 100!)
             $excluded_tags = array();
             $not_excluded_tags = array();
+            $short_tags = array();
+            $long_tags = array();
             
-            // Top 100 häufigste Tags analysieren
-            arsort($tag_counts);
-            $top_tags = array_slice($tag_counts, 0, 100, true);
-            
-            foreach ($top_tags as $tag => $count) {
+            // ALLE Tags durchgehen für Kategorisierung
+            foreach ($tag_counts as $tag => $count) {
+                // Kategorisierung nach Exklusion
                 if (isset($exclusion_words[$tag])) {
-                    $excluded_tags[] = array(
-                        'tag' => $tag,
-                        'count' => $count
-                    );
+                    $excluded_tags[] = $tag;
                 } else {
-                    $not_excluded_tags[] = array(
-                        'tag' => $tag,
-                        'count' => $count
-                    );
+                    $not_excluded_tags[] = $tag;
+                }
+                
+                // Kategorisierung nach Länge
+                $tag_length = mb_strlen($tag, 'UTF-8');
+                if ($tag_length <= 2) {
+                    $short_tags[] = $tag;
+                } elseif ($tag_length >= 15) {
+                    $long_tags[] = $tag;
                 }
             }
             
-            // ✅ Schritt 5: Ergebnis zurückgeben
+            // Nach Häufigkeit sortieren für Top-Tags (nur für die Anzeige der Top 10)
+            arsort($tag_counts);
+            $top_frequent_tags = array_slice($tag_counts, 0, 10, true);
+            
+            // Prozentuale Exklusionsrate berechnen
+            $exclusion_percentage = $unique_tags > 0 ? 
+                round((count($excluded_tags) / $unique_tags) * 100, 1) : 0;
+            
+            $processing_time = round(microtime(true) - $start_time, 2);
+            
+            // ✅ Schritt 5: ALLE Tags senden (keine Limitierung!)
             $result = array(
                 'message' => 'Tag-Analyse erfolgreich abgeschlossen',
-                'total_fahrplaene' => count($tag_rows),
-                'total_tags' => $total_tags,
-                'total_unique_tags' => $unique_tags,
-                'exclusion_words_count' => count($exclusion_words),
-                'excluded_tags' => array_slice($excluded_tags, 0, 20),  // Top 20 ausgeschlossene
-                'not_excluded_tags' => array_slice($not_excluded_tags, 0, 20),  // Top 20 nicht ausgeschlossene
-                'excluded_count' => count($excluded_tags),
-                'not_excluded_count' => count($not_excluded_tags)
+                'statistics' => array(
+                    'total_fahrplaene' => count($tag_rows),
+                    'total_tags' => $total_tags,
+                    'total_unique_tags' => $unique_tags,
+                    'excluded_count' => count($excluded_tags),
+                    'not_excluded_count' => count($not_excluded_tags),
+                    'exclusion_percentage' => $exclusion_percentage,
+                    'exclusion_list_size' => count($exclusion_words)
+                ),
+                'analysis' => array(
+                    // ALLE Tags senden, nicht nur Top 20 oder 100!
+                    'excluded_tags' => $excluded_tags,  // ALLE ausgeschlossenen Tags
+                    'not_excluded_tags' => $not_excluded_tags,  // ALLE nicht ausgeschlossenen Tags
+                    'excluded_tags_total' => count($excluded_tags),
+                    'not_excluded_tags_total' => count($not_excluded_tags),
+                    'top_frequent_tags' => $top_frequent_tags,
+                    'short_tags' => array_slice($short_tags, 0, 10),
+                    'long_tags' => array_slice($long_tags, 0, 10)
+                ),
+                'processing_time' => $processing_time
             );
             
             error_log('FAHRPLANPORTAL: Tag-Analyse abgeschlossen');
+            error_log('FAHRPLANPORTAL: Sende ' . count($not_excluded_tags) . ' nicht ausgeschlossene Tags');
+            error_log('FAHRPLANPORTAL: Sende ' . count($excluded_tags) . ' ausgeschlossene Tags');
+            
             wp_send_json_success($result);
             
         } catch (Exception $e) {

@@ -571,31 +571,165 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                     </div>
                 </div>
                 
-                <!-- ✅ NEU: ERGEBNISSE CONTAINER -->
-                <div id="tag-analysis-results" style="display: none; margin-top: 30px;">
-                    
-                    <!-- Statistiken -->
-                    <div id="tag-analysis-statistics" style="
-                        background: #fff3cd;
-                        border: 2px solid #ffc107;
-                        border-radius: 8px;
-                        padding: 20px;
-                        margin-bottom: 25px;
-                    ">
-                        <h4 style="margin: 0 0 15px 0; color: #856404;">📊 Analyse-Statistiken</h4>
-                        <div id="tag-stats-content" style="
-                            display: grid;
-                            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                            gap: 15px;
-                            color: #856404;
-                            font-weight: 500;
+                <!-- ✅ NEU: ERGEBNISSE CONTAINER (KOMPLETT) -->
+                    <div id="tag-analysis-results" style="display: none; margin-top: 30px;">
+                        
+                        <!-- Statistiken -->
+                        <div id="tag-analysis-statistics" style="
+                            background: #fff3cd;
+                            border: 2px solid #ffc107;
+                            border-radius: 8px;
+                            padding: 20px;
+                            margin-bottom: 25px;
                         ">
-                            <!-- Wird von JavaScript gefüllt -->
+                            <h4 style="margin: 0 0 15px 0; color: #856404;">📊 Analyse-Statistiken</h4>
+                            <div id="tag-stats-content" style="
+                                display: grid;
+                                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                                gap: 15px;
+                                color: #856404;
+                                font-weight: 500;
+                            ">
+                                <!-- Wird von JavaScript gefüllt -->
+                            </div>
+                        </div>
+                        
+                        <!-- ✅ TAG-LISTEN: FEHLENDE CONTAINER HINZUGEFÜGT -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                            
+                            <!-- Grüne Tags (Bereits ausgeschlossen) -->
+                            <div style="
+                                background: #d4edda;
+                                border: 2px solid #28a745;
+                                border-radius: 8px;
+                                padding: 20px;
+                            ">
+                                <h4 style="margin: 0 0 15px 0; color: #155724;">
+                                    🟢 Bereits ausgeschlossene Tags (<span id="excluded-tags-count">0</span>)
+                                </h4>
+                                <div id="excluded-tags-list" style="
+                                    max-height: 300px;
+                                    overflow-y: auto;
+                                    padding: 10px;
+                                    background: rgba(255, 255, 255, 0.7);
+                                    border-radius: 5px;
+                                    color: #155724;
+                                    font-size: 13px;
+                                    line-height: 1.8;
+                                ">
+                                    <!-- Wird von JavaScript gefüllt -->
+                                </div>
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #c3e6cb;">
+                                    <p style="margin: 0; font-size: 12px; color: #155724;">
+                                        ✅ Diese Tags werden bereits durch die Exklusionsliste gefiltert
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <!-- Rote Tags (Noch nicht ausgeschlossen) -->
+                            <div style="
+                                background: #f8d7da;
+                                border: 2px solid #dc3545;
+                                border-radius: 8px;
+                                padding: 20px;
+                            ">
+                                <h4 style="margin: 0 0 15px 0; color: #721c24;">
+                                    🔴 Noch nicht ausgeschlossene Tags (<span id="not-excluded-tags-count">0</span>)
+                                </h4>
+                                <div id="not-excluded-tags-list" style="
+                                    max-height: 300px;
+                                    overflow-y: auto;
+                                    padding: 10px;
+                                    background: rgba(255, 255, 255, 0.7);
+                                    border-radius: 5px;
+                                    color: #721c24;
+                                    font-size: 13px;
+                                    line-height: 1.8;
+                                ">
+                                    <!-- Wird von JavaScript gefüllt -->
+                                </div>
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f5c6cb;">
+                                    <button type="button" id="copy-red-tags" class="button button-secondary" style="
+                                        background: #dc3545;
+                                        border-color: #dc3545;
+                                        color: white;
+                                        font-size: 12px;
+                                        padding: 5px 15px;
+                                    ">
+                                        📋 Rote Tags kopieren
+                                    </button>
+                                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #721c24;">
+                                        ⚠️ Diese Tags könnten zur Exklusionsliste hinzugefügt werden
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Zusätzliche Analysen (Optional) -->
+                        <div style="margin-top: 25px;">
+                            <button type="button" id="show-analysis-extras" class="button button-secondary" style="
+                                background: #6c757d;
+                                border-color: #6c757d;
+                                color: white;
+                            ">
+                                📊 Zusätzliche Analysen anzeigen
+                            </button>
+                            
+                            <div id="tag-analysis-extras" style="display: none; margin-top: 20px;">
+                                <div style="
+                                    background: #e9ecef;
+                                    border: 2px solid #6c757d;
+                                    border-radius: 8px;
+                                    padding: 20px;
+                                ">
+                                    <h4 style="margin: 0 0 15px 0; color: #495057;">📈 Erweiterte Analyse</h4>
+                                    
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                                        
+                                        <!-- Top Häufige Tags -->
+                                        <div>
+                                            <h5 style="color: #495057; margin: 0 0 10px 0;">🏆 Top 10 häufigste Tags:</h5>
+                                            <div id="frequent-tags-list" style="
+                                                background: white;
+                                                padding: 10px;
+                                                border-radius: 5px;
+                                                font-size: 12px;
+                                                line-height: 1.8;
+                                            ">
+                                                <!-- Wird von JavaScript gefüllt -->
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Kurze Tags -->
+                                        <div>
+                                            <h5 style="color: #495057; margin: 0 0 10px 0;">📏 Sehr kurze Tags (≤2 Zeichen):</h5>
+                                            <div id="short-tags-list" style="
+                                                background: white;
+                                                padding: 10px;
+                                                border-radius: 5px;
+                                                font-size: 12px;
+                                            ">
+                                                <!-- Wird von JavaScript gefüllt -->
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Lange Tags -->
+                                        <div>
+                                            <h5 style="color: #495057; margin: 0 0 10px 0;">📐 Sehr lange Tags (≥15 Zeichen):</h5>
+                                            <div id="long-tags-list" style="
+                                                background: white;
+                                                padding: 10px;
+                                                border-radius: 5px;
+                                                font-size: 12px;
+                                            ">
+                                                <!-- Wird von JavaScript gefüllt -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Weitere Analyse-Bereiche werden hier eingefügt -->
-                </div>
             </div>
             <?php endif; ?>
         </div>
