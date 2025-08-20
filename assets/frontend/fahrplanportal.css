@@ -138,12 +138,13 @@
 }
 
 .fahrplanportal-validity {
-    text-align: center;
+    text-align: left;
     color: var(--fahrplanportal-secondary);
     font-weight: 500;
     font-size: 0.85rem;
     flex: 1;
     min-width: 200px;
+    padding-left:2%;
 }
 
 .fahrplanportal-region-desktop {

@@ -214,19 +214,18 @@ window.fahrplanportalInit = function(uniqueId) {
             $textSearch.on('input', function() {
                 var searchText = $(this).val().trim();
                 
-                clearTimeout(autocompleteTimeout);
+                // ✅ NEU: Bei Texteingabe Region zurücksetzen
+                if (searchText && $regionFilter.val()) {
+                    $regionFilter.val('');
+                    console.log('🔄 Region zurückgesetzt bei Texteingabe');
+                }
+                
+                // Autocomplete (bestehender Code)
                 if (searchText.length >= 2) {
-                    autocompleteTimeout = setTimeout(function() {
-                        performAutocomplete(searchText);
-                    }, 300);
+                    performAutocomplete(searchText);
                 } else {
                     hideAutocomplete();
                 }
-                
-                clearTimeout($textSearch.data('timeout'));
-                $textSearch.data('timeout', setTimeout(function() {
-                    performSearch();
-                }, 500));
             });
             
             $textSearch.on('keypress', function(e) {

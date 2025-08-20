@@ -1,6 +1,6 @@
 <?php
 /**
- * Fahrplanportal Frontend Shortcode - PRODUCTION VERSION
+ * Fahrplanportal Frontend Shortcode - ERWEITERTE VERSION
  * Frontend-Funktionen von fahrplanportal.php hierher verschoben
  * 
  * ✅ NEU: Unified Frontend-Funktionen von fahrplanportal.php übernommen
@@ -10,6 +10,8 @@
  * ✅ ERWEITERT: Tag-Extraktion für Autocomplete implementiert
  * ✅ PRODUCTION: Debug-Ausgaben entfernt, Live-Tag-Detection beibehalten
  * ✅ NEU: Search Logging Integration hinzugefügt
+ * ✅ ERWEITERT: Gültigkeitsprüfung für Fahrpläne hinzugefügt
+ * ✅ ERWEITERT: Aktualisierungshinweis im Frontend hinzugefügt
  */
 
 if (!defined('ABSPATH')) {
@@ -89,10 +91,11 @@ class FahrplanportalShortcode {
     
     // ========================================
     // ✅ NEU: UNIFIED FRONTEND HANDLER (von fahrplanportal.php verschoben)
+    // ✅ ERWEITERT: Mit Gültigkeitsprüfung
     // ========================================
     
     /**
-     * ✅ VERSCHOBEN: Frontend-Suche für Shortcode (von fahrplanportal.php)
+     * ✅ ERWEITERT: Frontend-Suche für Shortcode mit Gültigkeitsprüfung
      * ✅ ERWEITERT: Mit Search Logging Integration
      */
     public function unified_frontend_search() {
@@ -114,6 +117,13 @@ class FahrplanportalShortcode {
         $where_conditions = array();
         $query_params = array();
         
+        // ✅ NEU: Gültigkeitsprüfung hinzufügen - nur gültige Fahrpläne anzeigen
+        $today = date('Y-m-d');
+        $where_conditions[] = "(gueltig_von IS NULL OR gueltig_von <= %s)";
+        $where_conditions[] = "(gueltig_bis IS NULL OR gueltig_bis >= %s)";
+        $query_params[] = $today;
+        $query_params[] = $today;
+        
         // ✅ NEU: Such-Parameter für Logging vorbereiten
         $search_log_term = '';
 
@@ -132,21 +142,26 @@ class FahrplanportalShortcode {
                 $search_fields[] = "tags LIKE %s";
             }
             
-            $where_clause = "region = %s AND (" . implode(" OR ", $search_fields) . ")";
+            $where_conditions[] = "region = %s";
+            $where_conditions[] = "(" . implode(" OR ", $search_fields) . ")";
             $query_params[] = $region;
             
             $search_param = '%' . $wpdb->esc_like($search_text) . '%';
-            foreach ($search_fields as $field) {
+            $search_count = count($search_fields);
+            for ($i = 0; $i < $search_count; $i++) {
                 $query_params[] = $search_param;
             }
+            
         } elseif (!empty($region)) {
             // Nur Region
             $search_log_term = 'Region: ' . $region;
-            $where_clause = "region = %s";
+            $where_conditions[] = "region = %s";
             $query_params[] = $region;
+            
         } elseif (!empty($search_text)) {
             // Nur Suchtext
             $search_log_term = $search_text;
+            
             $search_fields = array(
                 "titel LIKE %s",
                 "linie_alt LIKE %s", 
@@ -158,13 +173,16 @@ class FahrplanportalShortcode {
                 $search_fields[] = "tags LIKE %s";
             }
             
-            $where_clause = "(" . implode(" OR ", $search_fields) . ")";
+            $where_conditions[] = "(" . implode(" OR ", $search_fields) . ")";
             
             $search_param = '%' . $wpdb->esc_like($search_text) . '%';
-            foreach ($search_fields as $field) {
+            $search_count = count($search_fields);
+            for ($i = 0; $i < $search_count; $i++) {
                 $query_params[] = $search_param;
             }
         }
+        
+        $where_clause = implode(' AND ', $where_conditions);
         
         $query = "
             SELECT * FROM {$this->table_name} 
@@ -214,6 +232,7 @@ class FahrplanportalShortcode {
     
     /**
      * ✅ ERWEITERT: Frontend-Autocomplete mit Tag-Unterstützung (von fahrplanportal.php)
+     * ✅ ERWEITERT: Mit Gültigkeitsprüfung
      * ✅ HINWEIS: Autocomplete wird NICHT geloggt (zu viele Requests)
      */
     public function unified_frontend_autocomplete() {
@@ -233,23 +252,8 @@ class FahrplanportalShortcode {
         $suggestions = array();
         $word_frequency = array();
         
-        // 1. REGIONEN EXTRAHIEREN
-        $regions = $this->extract_frontend_regions($search_param, $wpdb);
-        foreach ($regions as $region_data) {
-            $region = strtolower(trim($region_data['region']));
-            if (strlen($region) >= 2 && stripos($region, trim($search_term)) !== false) {
-                if (!isset($word_frequency[$region])) {
-                    $word_frequency[$region] = array(
-                        'word' => $region_data['region'],
-                        'count' => 0,
-                        'source' => 'Region'
-                    );
-                }
-                $word_frequency[$region]['count'] += $region_data['count'];
-            }
-        }
         
-        // 2. LINIENNUMMERN
+        // 1. LINIENNUMMERN
         $line_numbers = $this->extract_frontend_line_numbers($search_param, $wpdb);
         foreach ($line_numbers as $line_data) {
             $line = trim($line_data['line']);
@@ -265,7 +269,7 @@ class FahrplanportalShortcode {
             }
         }
         
-        // 3. ORTSNAMEN AUS TITELN
+        // 2. ORTSNAMEN AUS TITELN
         $title_words = $this->extract_frontend_title_words($search_param, $wpdb);
         foreach ($title_words as $word_data) {
             $word = strtolower(trim($word_data['word']));
@@ -281,7 +285,7 @@ class FahrplanportalShortcode {
             }
         }
         
-        // ✅ LIVE-FIX: 4. TAG-WÖRTER MIT LIVE-CHECK
+        // 3. TAG-WÖRTER MIT LIVE-CHECK
         if ($live_pdf_parsing) {
             $tag_words = $this->extract_frontend_tag_words($search_param, $wpdb, $search_term);
             
@@ -354,17 +358,24 @@ class FahrplanportalShortcode {
     
     // ========================================
     // ✅ ERWEITERT: FRONTEND HELPER-METHODEN (mit Tag-Extraktion)
+    // ✅ ERWEITERT: Mit Gültigkeitsprüfung
     // ========================================
     
     private function extract_frontend_regions($search_param, $wpdb) {
+        // ✅ NEU: Gültigkeitsprüfung in SQL
+        $today = date('Y-m-d');
+        
         $results = $wpdb->get_results($wpdb->prepare("
             SELECT region, COUNT(*) as count
             FROM {$this->table_name} 
-            WHERE region LIKE %s AND region != ''
+            WHERE region LIKE %s 
+            AND region != ''
+            AND (gueltig_von IS NULL OR gueltig_von <= %s)
+            AND (gueltig_bis IS NULL OR gueltig_bis >= %s)
             GROUP BY region
             ORDER BY count DESC
             LIMIT 10
-        ", $search_param));
+        ", $search_param, $today, $today));
         
         return array_map(function($result) {
             return array('region' => $result->region, 'count' => $result->count);
@@ -373,6 +384,9 @@ class FahrplanportalShortcode {
     
     // ✅ GEÄNDERT: Unterstützt jetzt 2-4 stellige Nummern
     private function extract_frontend_line_numbers($search_param, $wpdb) {
+        // ✅ NEU: Gültigkeitsprüfung in SQL
+        $today = date('Y-m-d');
+        
         $results = $wpdb->get_results($wpdb->prepare("
             SELECT 
                 CASE 
@@ -383,11 +397,13 @@ class FahrplanportalShortcode {
             FROM {$this->table_name} 
             WHERE (linie_alt LIKE %s OR linie_neu LIKE %s)
             AND (linie_alt LIKE %s OR linie_neu LIKE %s)
+            AND (gueltig_von IS NULL OR gueltig_von <= %s)
+            AND (gueltig_bis IS NULL OR gueltig_bis >= %s)
             GROUP BY line_number
             HAVING line_number IS NOT NULL
             ORDER BY count DESC
             LIMIT 10
-        ", $search_param, $search_param, $search_param, $search_param, $search_param, $search_param));
+        ", $search_param, $search_param, $search_param, $search_param, $search_param, $search_param, $today, $today));
         
         $lines = array();
         foreach ($results as $result) {
@@ -404,14 +420,19 @@ class FahrplanportalShortcode {
     }
     
     private function extract_frontend_title_words($search_param, $wpdb) {
+        // ✅ NEU: Gültigkeitsprüfung in SQL
+        $today = date('Y-m-d');
+        
         $results = $wpdb->get_results($wpdb->prepare("
             SELECT titel, COUNT(*) as count
             FROM {$this->table_name} 
             WHERE titel LIKE %s 
+            AND (gueltig_von IS NULL OR gueltig_von <= %s)
+            AND (gueltig_bis IS NULL OR gueltig_bis >= %s)
             GROUP BY titel
             ORDER BY count DESC
             LIMIT 20
-        ", $search_param));
+        ", $search_param, $today, $today));
         
         $words = array();
         foreach ($results as $result) {
@@ -424,7 +445,7 @@ class FahrplanportalShortcode {
                     $word = trim($word);
                     
                     if (strlen($word) >= 2 && !is_numeric($word)) {
-                        if ($this->is_likely_place_name($word)) {
+                        if ($this->is_relevant_place_word($word)) {
                             $word_lower = strtolower($word);
                             if (!isset($words[$word_lower])) {
                                 $words[$word_lower] = array('word' => $word, 'count' => 0);
@@ -447,10 +468,13 @@ class FahrplanportalShortcode {
             return array();
         }
         
-        // Alle Einträge mit Tags holen die dem Suchbegriff entsprechen
-        $query = "SELECT tags, COUNT(*) as count FROM {$this->table_name} WHERE tags IS NOT NULL AND tags != '' AND tags LIKE %s GROUP BY tags ORDER BY count DESC LIMIT 50";
+        // ✅ NEU: Gültigkeitsprüfung in SQL
+        $today = date('Y-m-d');
         
-        $results = $wpdb->get_results($wpdb->prepare($query, $search_param));
+        // Alle Einträge mit Tags holen die dem Suchbegriff entsprechen
+        $query = "SELECT tags, COUNT(*) as count FROM {$this->table_name} WHERE tags IS NOT NULL AND tags != '' AND tags LIKE %s AND (gueltig_von IS NULL OR gueltig_von <= %s) AND (gueltig_bis IS NULL OR gueltig_bis >= %s) GROUP BY tags ORDER BY count DESC LIMIT 50";
+        
+        $results = $wpdb->get_results($wpdb->prepare($query, $search_param, $today, $today));
         
         if ($wpdb->last_error || empty($results)) {
             return array();
@@ -583,10 +607,14 @@ class FahrplanportalShortcode {
         return false;
     }
     
-    private function is_likely_place_name($word) {
+    private function is_relevant_place_word($word) {
+        if (empty($word) || strlen($word) < 3) {
+            return false;
+        }
+        
         $place_indicators = array(
-            'bach', 'berg', 'dorf', 'feld', 'hof', 'kirchen', 'stadt', 'markt',
-            'sankt', 'st.', 'bad', 'neu', 'alt', 'groß', 'klein',
+            'dorf', 'stadt', 'berg', 'tal', 'feld', 'hof', 'kirchen', 'markt',
+            'bad', 'neu', 'alt', 'groß', 'klein',
             'veit', 'paul', 'georgen', 'michael', 'stefan'
         );
         
@@ -700,82 +728,82 @@ class FahrplanportalShortcode {
     }
     
     /**
- * ✅ VERBESSERT: Frontend Fahrplan-Item rendern mit Mobile Download-Layout
- */
-private function render_frontend_fahrplan_item($fahrplan) {
-    $pdf_url = site_url('fahrplaene/' . $fahrplan->pdf_pfad);
-    
-    // ✅ NEU: Verwende die intelligente Datumsfunktion
-    $validity_text = $this->format_validity_period($fahrplan->gueltig_von, $fahrplan->gueltig_bis);
-    
-    ob_start();
-    ?>
-    <a href="<?php echo esc_url($pdf_url); ?>" 
-       target="_blank" 
-       class="card fahrplanportal-item text-decoration-none text-reset mb-3"
-       data-fahrplan-id="<?php echo esc_attr($fahrplan->id); ?>">
-       
-        <div class="card-body">
-            <div class="fahrplanportal-item-content">
+     * ✅ VERBESSERT: Frontend Fahrplan-Item rendern mit Mobile Download-Layout
+     */
+    private function render_frontend_fahrplan_item($fahrplan) {
+        $pdf_url = site_url('fahrplaene/' . $fahrplan->pdf_pfad);
+        
+        // ✅ NEU: Verwende die intelligente Datumsfunktion
+        $validity_text = $this->format_validity_period($fahrplan->gueltig_von, $fahrplan->gueltig_bis);
+        
+        ob_start();
+        ?>
+        <a href="<?php echo esc_url($pdf_url); ?>" 
+           target="_blank" 
+           class="card fahrplanportal-item text-decoration-none text-reset mb-3"
+           data-fahrplan-id="<?php echo esc_attr($fahrplan->id); ?>">
+           
+            <div class="card-body">
+                <div class="fahrplanportal-item-content">
+                    
+                    <div class="fahrplanportal-top-row">
+                        <div class="fahrplanportal-badges">
+                            <?php if (!empty($fahrplan->linie_neu)): ?>
+                                <span class="badge bg-success fahrplan-line-badge"><?php echo esc_html($fahrplan->linie_neu); ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($fahrplan->linie_alt)): ?>
+                                <span class="badge bg-primary fahrplan-line-badge"><?php echo esc_html($fahrplan->linie_alt); ?></span>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="fahrplanportal-validity">
+                            <?php 
+                            // ✅ NEU: Einfache Ausgabe der intelligent formatierten Gültigkeitsdauer
+                            if (!empty($validity_text)) {
+                                echo esc_html($validity_text);
+                            }
+                            ?>
+                        </div>
+                        
+                        <div class="fahrplanportal-region-desktop">
+                            <i class="fa-regular fa-map me-2"></i>
+                            <?php echo esc_html($fahrplan->region); ?>
+                        </div>
+                    </div>
+                    
+                    <div class="fahrplanportal-title">
+                        <p><?php echo esc_html($fahrplan->titel); ?></p>
+                    </div>
+                    
+                    <?php if (!empty($fahrplan->kurzbeschreibung)): ?>
+                    <div class="fahrplanportal-description">
+                        <p><?php echo esc_html($fahrplan->kurzbeschreibung); ?></p>
+                    </div>
+                    <?php endif; ?>
+                    
+                </div>
                 
-                <div class="fahrplanportal-top-row">
-                    <div class="fahrplanportal-badges">
-                        <?php if (!empty($fahrplan->linie_neu)): ?>
-                            <span class="badge bg-success fahrplan-line-badge"><?php echo esc_html($fahrplan->linie_neu); ?></span>
-                        <?php endif; ?>
-                        <?php if (!empty($fahrplan->linie_alt)): ?>
-                            <span class="badge bg-primary fahrplan-line-badge"><?php echo esc_html($fahrplan->linie_alt); ?></span>
-                        <?php endif; ?>
-                    </div>
-                    
-                    <div class="fahrplanportal-validity">
-                        <?php 
-                        // ✅ NEU: Einfache Ausgabe der intelligent formatierten Gültigkeitsdauer
-                        if (!empty($validity_text)) {
-                            echo esc_html($validity_text);
-                        }
-                        ?>
-                    </div>
-                    
-                    <div class="fahrplanportal-region-desktop">
+                <!-- ✅ NEU: Mobile Region + Download Row -->
+                <div class="fahrplanportal-mobile-bottom">
+                    <div class="fahrplanportal-region-mobile">
                         <i class="fas fa-map-marker-alt text-primary me-2"></i>
                         <?php echo esc_html($fahrplan->region); ?>
                     </div>
-                </div>
-                
-                <div class="fahrplanportal-title">
-                    <p><?php echo esc_html($fahrplan->titel); ?></p>
-                </div>
-                
-                <?php if (!empty($fahrplan->kurzbeschreibung)): ?>
-                <div class="fahrplanportal-description">
-                    <p><?php echo esc_html($fahrplan->kurzbeschreibung); ?></p>
-                </div>
-                <?php endif; ?>
-                
-            </div>
-            
-            <!-- ✅ NEU: Mobile Region + Download Row -->
-            <div class="fahrplanportal-mobile-bottom">
-                <div class="fahrplanportal-region-mobile">
-                    <i class="fas fa-map-marker-alt text-primary me-2"></i>
-                    <?php echo esc_html($fahrplan->region); ?>
-                </div>
-                
-                <div class="fahrplanportal-download">
-                    <div class="fahrplan-download-btn">
-                        <i class="fas fa-download"></i>
+                    
+                    <div class="fahrplanportal-download">
+                        <div class="fahrplan-download-btn">
+                            <i class="fas fa-download"></i>
+                        </div>
                     </div>
                 </div>
+                
             </div>
             
-        </div>
+        </a>
+        <?php
         
-    </a>
-    <?php
-    
-    return ob_get_clean();
-}
+        return ob_get_clean();
+    }
     
     
     // ========================================
@@ -885,6 +913,27 @@ private function render_frontend_fahrplan_item($fahrplan) {
         return $date;
     }
     
+    /**
+     * ✅ NEU: Letzte Aktualisierung der Fahrpläne ermitteln
+     */
+    private function get_last_update_date() {
+        global $wpdb;
+        
+        $last_update = $wpdb->get_var("
+            SELECT MAX(updated_at) 
+            FROM {$this->table_name}
+        ");
+        
+        if ($last_update) {
+            $timestamp = strtotime($last_update);
+            if ($timestamp) {
+                return date('d.m.Y H:i', $timestamp);
+            }
+        }
+        
+        return false;
+    }
+    
     public function render_shortcode($atts) {
         $atts = shortcode_atts(array(
             'region' => '',
@@ -895,9 +944,22 @@ private function render_frontend_fahrplan_item($fahrplan) {
         $unique_id = 'fahrplanportal-' . uniqid();
         $regions = $this->get_available_regions();
         
+        // ✅ NEU: Letzte Aktualisierung ermitteln
+        $last_update = $this->get_last_update_date();
+        
         ob_start();
         ?>
         <div class="fahrplanportal-frontend" id="<?php echo esc_attr($unique_id); ?>" data-max-results="<?php echo esc_attr($atts['max_results']); ?>">
+            
+            <!-- ✅ NEU: Aktualisierungshinweis oberhalb der Filter -->
+            <?php if ($last_update): ?>
+            <div class="fahrplanportal-update-info mb-3">
+                <small style="display:block;font-size: 0.85em;text-align: right;" class="text-muted">
+                    <i class="fa-solid fa-arrows-rotate"></i> 
+                    Letzte Aktualisierung: <i class="fa-regular fa-clock"></i> <?php echo esc_html($last_update); ?>
+                </small>
+            </div>
+            <?php endif; ?>
             
             <div class="fahrplanportal-filters">
                 <div class="row g-3 align-items-end">
@@ -921,9 +983,6 @@ private function render_frontend_fahrplan_item($fahrplan) {
                     <div class="col-md-5">
                         <label for="<?php echo esc_attr($unique_id); ?>-search" class="form-label">
                             Nach Linie oder Ort filtern:
-                            <?php /* if ($this->has_tags_column()): ?>
-                                <small class="text-muted">(inkl. Inhalte)</small>
-                            <?php endif; */ ?>
                         </label>
                         <div class="autocomplete-wrapper">
                             <input type="text" 
@@ -957,9 +1016,6 @@ private function render_frontend_fahrplan_item($fahrplan) {
                         <h5>Filter verwenden</h5>
                         <p class="text-muted">
                             Bitte wählen Sie eine Region oder geben Sie einen Suchbegriff ein, um Fahrpläne anzuzeigen.
-                            <?php /* if ($this->has_tags_column()): ?>
-                                <br><small><strong>Tipp:</strong> Sie können auch nach Inhalten der PDFs suchen!</small>
-                            <?php endif; */ ?>
                         </p>
                     </div>
                 </div>
