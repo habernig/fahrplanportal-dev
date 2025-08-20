@@ -783,8 +783,11 @@ class FahrplanPortal_Ajax {
     
 
     /**
-     * ✅ NEU: Alle Tags aus der Datenbank analysieren
-     * GEFIXT: Verarbeitet und sendet ALLE Tags, nicht nur Top 100
+     * ✅ Alle Tags aus der Datenbank analysieren
+     * Mit alphabetischer Sortierung der not_excluded_tags
+     * 
+     * Diese Funktion ersetzt die bestehende unified_analyze_all_tags() 
+     * in includes/class-fahrplanportal-ajax.php
      */
     public function unified_analyze_all_tags() {
         if (!current_user_can('manage_options')) {
@@ -887,6 +890,17 @@ class FahrplanPortal_Ajax {
                 }
             }
             
+            // ✅ NEU: ALPHABETISCHE SORTIERUNG (aufsteigend, case-insensitive)
+            // Sortiere excluded_tags alphabetisch
+            sort($excluded_tags, SORT_STRING | SORT_FLAG_CASE);
+            
+            // ✅ WICHTIG: Sortiere not_excluded_tags alphabetisch aufsteigend
+            sort($not_excluded_tags, SORT_STRING | SORT_FLAG_CASE);
+            
+            // Sortiere auch die kurzen und langen Tags alphabetisch
+            sort($short_tags, SORT_STRING | SORT_FLAG_CASE);
+            sort($long_tags, SORT_STRING | SORT_FLAG_CASE);
+            
             // Nach Häufigkeit sortieren für Top-Tags (nur für die Anzeige der Top 10)
             arsort($tag_counts);
             $top_frequent_tags = array_slice($tag_counts, 0, 10, true);
@@ -896,6 +910,10 @@ class FahrplanPortal_Ajax {
                 round((count($excluded_tags) / $unique_tags) * 100, 1) : 0;
             
             $processing_time = round(microtime(true) - $start_time, 2);
+            
+            // ✅ Debug-Log für Sortierung
+            error_log('FAHRPLANPORTAL: not_excluded_tags alphabetisch sortiert - erste 10: ' . 
+                      implode(', ', array_slice($not_excluded_tags, 0, 10)));
             
             // ✅ Schritt 5: ALLE Tags senden (keine Limitierung!)
             $result = array(
@@ -911,8 +929,8 @@ class FahrplanPortal_Ajax {
                 ),
                 'analysis' => array(
                     // ALLE Tags senden, nicht nur Top 20 oder 100!
-                    'excluded_tags' => $excluded_tags,  // ALLE ausgeschlossenen Tags
-                    'not_excluded_tags' => $not_excluded_tags,  // ALLE nicht ausgeschlossenen Tags
+                    'excluded_tags' => $excluded_tags,  // ALLE ausgeschlossenen Tags (alphabetisch)
+                    'not_excluded_tags' => $not_excluded_tags,  // ALLE nicht ausgeschlossenen Tags (alphabetisch)
                     'excluded_tags_total' => count($excluded_tags),
                     'not_excluded_tags_total' => count($not_excluded_tags),
                     'top_frequent_tags' => $top_frequent_tags,
@@ -923,8 +941,8 @@ class FahrplanPortal_Ajax {
             );
             
             error_log('FAHRPLANPORTAL: Tag-Analyse abgeschlossen');
-            error_log('FAHRPLANPORTAL: Sende ' . count($not_excluded_tags) . ' nicht ausgeschlossene Tags');
-            error_log('FAHRPLANPORTAL: Sende ' . count($excluded_tags) . ' ausgeschlossene Tags');
+            error_log('FAHRPLANPORTAL: Sende ' . count($not_excluded_tags) . ' nicht ausgeschlossene Tags (alphabetisch sortiert)');
+            error_log('FAHRPLANPORTAL: Sende ' . count($excluded_tags) . ' ausgeschlossene Tags (alphabetisch sortiert)');
             
             wp_send_json_success($result);
             
