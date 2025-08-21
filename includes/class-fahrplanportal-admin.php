@@ -163,19 +163,6 @@ class FahrplanPortal_Admin {
                 <?php endif; ?>
             </div>
 
-            <!-- ✅ NEU: Tabelle Status Aktualisierung -->
-            <div style="margin: 20px 0; border-top: 1px solid #ddd; padding-top: 20px;">
-                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                    <button type="button" id="update-table-status" class="button button-secondary">
-                        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
-                        Tabelle aktualisieren
-                    </button>
-                    <span id="status-update-info" style="color: #666; font-size: 14px;">
-                        Überprüft PDF-Status und findet neue Dateien
-                    </span>
-                </div>
-            </div>
-            
             <!-- ✅ NEU: Chunked Progress Bar -->
             <div id="scan-progress-container" style="display: none;">
                 <div class="card" style="border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 6px;">
@@ -255,17 +242,31 @@ class FahrplanPortal_Admin {
                     </select>
                     <button type="button" id="clear-filter" class="button button-secondary">Filter zurücksetzen</button>
                 </div>
+
+                <!-- ✅ NEU: Tabelle Status Aktualisierung -->
+                <div style="margin: 20px 0; border-top: 1px solid #ddd; padding-top: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        <button type="button" id="update-table-status" class="button button-secondary">
+                            <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
+                            Tabelle aktualisieren
+                        </button>
+                        <span id="status-update-info" style="color: #666; font-size: 14px;">
+                            Überprüft PDF-Status und findet neue Dateien
+                        </span>
+                    </div>
+                </div>
+                
                 
                 <table id="fahrplaene-table" class="display nowrap" style="width: 100%;">
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>Status</th>
                             <th>Linie Alt</th>
                             <th>Linie Neu</th>
                             <th>Titel</th>
                             <th>Gültig von</th>
                             <th>Gültig bis</th>
+                            <th>Status</th>
                             <th>Ordner</th>
                             <th>Region</th>
                             <th>PDF</th>
@@ -1000,14 +1001,14 @@ ST3:STADT3
             $output .= sprintf(
                 '<tr data-id="%d">
                     <td>%d</td>
+                    <td>%s</td>
+                    <td>%s</td>
+                    <td>%s</td>
+                    <td>%s</td>
+                    <td>%s</td>
                     <td id="status-%d">
                         <span class="status-loading">⏳ Laden...</span>
                     </td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
                     <td>%s</td>
                     <td>%s</td>
                     <td><a href="%s" target="_blank"><span class="dashicons dashicons-media-document"></span></a></td>
@@ -1024,12 +1025,12 @@ ST3:STADT3
                 </tr>',
                 $row->id,                    // ID
                 $row->id,                    // ID (nochmal für Anzeige)
-                $row->id,                    // Status id
                 esc_html($row->linie_alt),   // Linie Alt
                 esc_html($row->linie_neu),   // Linie Neu  
                 esc_html($row->titel),       // Titel
                 esc_html($gueltig_von_de),   // Gültig von
                 esc_html($gueltig_bis_de),   // Gültig bis
+                $row->id,                    // Status id
                 esc_html($row->jahr),        // Ordner
                 esc_html($region),           // Region
                 esc_url($pdf_url),           // PDF
