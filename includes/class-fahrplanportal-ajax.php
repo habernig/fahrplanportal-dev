@@ -177,6 +177,8 @@ class FahrplanPortal_Ajax {
             'region_stats' => array(),  // NEU: Für Regionen-Statistik
             'files' => array()
         );
+
+        $error_details = array();
         
         foreach ($chunk_files as $file_info) {
             try {
@@ -219,11 +221,22 @@ class FahrplanPortal_Ajax {
                     'status' => 'error',
                     'message' => $e->getMessage()
                 );
+                
+                // ✅ NEU: Fehler-Details für Client sammeln
+                $error_details[] = array(
+                    'file' => $file_info['filename'],
+                    'error' => $e->getMessage(),
+                    'region' => $file_info['region'] ?? 'Unbekannte Region'
+                );
+                
                 error_log('FAHRPLANPORTAL: Fehler bei ' . $file_info['filename'] . ' - ' . $e->getMessage());
             }
         }
 
         $chunk_stats['processed'] = $chunk_stats['imported'] + $chunk_stats['skipped'] + $chunk_stats['errors'];
+        
+        // ✅ NEU: Error-Details in Stats integrieren
+        $chunk_stats['error_details'] = $error_details;
         
         // Chunk-Ergebnis zurückgeben
         wp_send_json_success(array(
