@@ -41,7 +41,7 @@ class FahrplanportalShortcode {
         add_shortcode('fahrplanportal', array($this, 'render_shortcode'));
         
         // ✅ NEU: Unified Frontend Handler registrieren
-        add_action('admin_init', array($this, 'register_unified_frontend_handlers'), 25);
+        add_action('init', array($this, 'register_unified_frontend_handlers'), 15);
         
         // Scripts laden
         add_action('wp_enqueue_scripts', array($this, 'maybe_enqueue_assets'));
@@ -62,9 +62,17 @@ class FahrplanportalShortcode {
      * ✅ NEU: Frontend Handler im Unified System registrieren
      */
     public function register_unified_frontend_handlers() {
-        // Nur bei Admin + AJAX registrieren
+        
+        // ✅ KORRIGIERT: Frontend-AJAX auch erlauben
         if (!is_admin() && !(defined('DOING_AJAX') && DOING_AJAX)) {
+            // Nur echtes Frontend (ohne AJAX) überspringen
             return;
+        }
+        
+        // ✅ ZUSÄTZLICH: Bei AJAX immer registrieren, auch Frontend-AJAX
+        if (defined('DOING_AJAX') && DOING_AJAX) {
+            // AJAX-Call erkannt - immer registrieren
+            $this->debug_log('🔄 FAHRPLANPORTAL SHORTCODE: AJAX-Call erkannt, registriere Handler');
         }
         
         // Unified System verfügbar?
@@ -86,7 +94,8 @@ class FahrplanportalShortcode {
             'autocomplete' => array($this, 'unified_frontend_autocomplete'),
         ));
         
-        $this->debug_log('✅ FAHRPLANPORTAL SHORTCODE: Frontend Handler im Unified System registriert');
+        $this->debug_log('✅ FAHRPLANPORTAL SHORTCODE: Frontend Handler als "fahrplanportal_frontend" registriert');
+        error_log('🎯 FAHRPLANPORTAL: Frontend-Module verfügbar für AJAX-Calls');
     }
     
     // ========================================
@@ -192,8 +201,19 @@ class FahrplanportalShortcode {
         ";
         
         $query_params[] = $max_results;
+
+        // ✅ DEBUG: Query und Parameter ausgeben
+        $debug_query = $wpdb->prepare($query, $query_params);
+        error_log('🔍 FAHRPLANPORTAL DEBUG Query: ' . $debug_query);
+        error_log('🔍 FAHRPLANPORTAL DEBUG Params: ' . print_r($query_params, true));
         
         $results = $wpdb->get_results($wpdb->prepare($query, $query_params));
+
+        // ✅ DEBUG: Ergebnisse und Fehler prüfen
+        error_log('🔍 FAHRPLANPORTAL DEBUG Results count: ' . count($results));
+        if ($wpdb->last_error) {
+            error_log('❌ FAHRPLANPORTAL DEBUG SQL Error: ' . $wpdb->last_error);
+        }
         
         if ($wpdb->last_error) {
             $this->debug_log('❌ FAHRPLANPORTAL SHORTCODE: DB Error - ' . $wpdb->last_error);
