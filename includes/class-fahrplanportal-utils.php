@@ -44,6 +44,7 @@ class FahrplanPortal_Utils {
                 
                 // 3-teilige Muster  
                 'stein-im-jauntal' => '§STEIN_IM_JAUNTAL§',
+                'an-der-glan' => '§AN_DER_GLAN§',
                 'an-der-drau' => '§AN_DER_DRAU§',
                 'ob-der-gurk' => '§OB_DER_GURK§',
                 'im-jauntal' => '§IM_JAUNTAL§',

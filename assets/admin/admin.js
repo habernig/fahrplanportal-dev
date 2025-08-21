@@ -1339,7 +1339,7 @@ function initializeFahrplanportalAdmin() {
         var regionFilter = $('#region-filter');
         
         $('#fahrplaene-table tbody tr').each(function() {
-            var regionCell = $(this).find('td:nth-child(8)');
+            var regionCell = $(this).find('td:nth-child(9)');
             var regionText = '';
             
             // FIX: Sichere Text-Extraktion
@@ -1366,7 +1366,7 @@ function initializeFahrplanportalAdmin() {
     function setupAdminRegionFilter(fahrplaeneTable) {
         $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
             var selectedRegion = $('#region-filter').val();
-            var regionColumn = data[7];
+            var regionColumn = data[8];
             
             if (!selectedRegion || selectedRegion === '') {
                 return true;
