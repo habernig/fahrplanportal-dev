@@ -51,7 +51,7 @@ class FahrplanPortal_Ajax {
             return;
         }
         
-        // ✅ ERWEITERT: Admin-Module (jetzt mit Tag-Analyse)
+        // ✅ ERWEITERT: Admin-Module (jetzt mit zweistufiger Synchronisation)
         $unified_system->register_module('fahrplanportal', array(
             'scan_fahrplaene' => array($this, 'unified_scan_fahrplaene'),
             'scan_chunk' => array($this, 'unified_scan_chunk'),
@@ -68,9 +68,15 @@ class FahrplanPortal_Ajax {
             'analyze_all_tags' => array($this, 'unified_analyze_all_tags'),
             'cleanup_existing_tags' => array($this, 'unified_cleanup_existing_tags'),
             'update_mapping_in_db' => array($this, 'unified_update_mapping_in_db'),
+            // ✅ ERWEITERT: Zweistufige Synchronisation Handler
+            'sync_table' => array($this, 'unified_sync_table'),
+            'import_single_pdf' => array($this, 'unified_import_single_pdf'),
+            'delete_missing_pdfs' => array($this, 'unified_delete_missing_pdfs'),
+            'get_missing_pdfs' => array($this, 'unified_get_missing_pdfs'),
         ));
         
         error_log('✅ FAHRPLANPORTAL: Admin Handler mit Tag-Analyse im Unified System registriert');
+
     }
     
     /**
@@ -1089,6 +1095,289 @@ class FahrplanPortal_Ajax {
         } catch (Exception $e) {
             error_log('FAHRPLANPORTAL: Tag-Cleanup Exception: ' . $e->getMessage());
             wp_send_json_error('Fehler bei Tag-Bereinigung: ' . $e->getMessage());
+        }
+    }
+
+ 
+    /**
+     * ✅ ERWEITERT: Tabelle mit physikalischen Ordnern synchronisieren (zweistufig)
+     */
+    public function unified_sync_table() {
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        error_log('FAHRPLANPORTAL: Start unified_sync_table (zweistufig)');
+        
+        $sync_stats = array(
+            'total_db_entries' => 0,
+            'status_ok' => 0,
+            'status_missing' => 0,
+            'status_import' => 0,
+            'marked_missing' => 0,
+            'marked_import' => 0,
+            'already_missing' => 0,
+            'errors' => 0,
+            'missing_files' => array(),
+            'new_files' => array()
+        );
+        
+        try {
+            // 1. Alle DB-Einträge laden
+            $all_fahrplaene = $this->database->get_all_fahrplaene();
+            $sync_stats['total_db_entries'] = count($all_fahrplaene);
+            
+            // 2. Für jeden DB-Eintrag prüfen ob PDF existiert
+            foreach ($all_fahrplaene as $fahrplan) {
+                $pdf_path = ABSPATH . 'fahrplaene/' . $fahrplan->pdf_pfad;
+                $current_status = $fahrplan->pdf_status ?? 'OK';
+                
+                if (file_exists($pdf_path)) {
+                    // PDF existiert - Status auf OK setzen falls es anders war
+                    if ($current_status !== 'OK') {
+                        $this->database->update_pdf_status($fahrplan->id, 'OK');
+                        error_log('FAHRPLANPORTAL: Status korrigiert zu OK: ' . $fahrplan->pdf_pfad);
+                    }
+                    $sync_stats['status_ok']++;
+                } else {
+                    // PDF fehlt - Status auf MISSING setzen (nicht löschen!)
+                    if ($current_status !== 'MISSING') {
+                        $this->database->update_pdf_status($fahrplan->id, 'MISSING');
+                        $sync_stats['marked_missing']++;
+                        $sync_stats['missing_files'][] = array(
+                            'id' => $fahrplan->id,
+                            'titel' => $fahrplan->titel,
+                            'pdf_pfad' => $fahrplan->pdf_pfad
+                        );
+                        error_log('FAHRPLANPORTAL: PDF als MISSING markiert: ' . $fahrplan->pdf_pfad);
+                    } else {
+                        $sync_stats['already_missing']++;
+                    }
+                    $sync_stats['status_missing']++;
+                }
+            }
+            
+            // 3. Neue PDFs in Ordnern finden
+            $base_path = ABSPATH . 'fahrplaene/';
+            if (is_dir($base_path)) {
+                $folders = glob($base_path . '*', GLOB_ONLYDIR);
+                
+                foreach ($folders as $folder_path) {
+                    $folder_name = basename($folder_path);
+                    
+                    // Alle PDFs in diesem Ordner finden
+                    $new_pdfs = $this->find_new_pdfs_in_folder($folder_name);
+                    
+                    foreach ($new_pdfs as $new_pdf) {
+                        // Neues PDF als IMPORT markieren (wird später erstellt)
+                        $sync_stats['marked_import']++;
+                        $sync_stats['new_files'][] = array(
+                            'filename' => $new_pdf['filename'],
+                            'folder' => $folder_name,
+                            'region' => $new_pdf['region'],
+                            'relative_path' => $new_pdf['relative_path']
+                        );
+                    }
+                }
+            }
+            
+            $sync_stats['status_import'] = $sync_stats['marked_import'];
+            
+            // 4. Status-Zusammenfassung laden
+            $status_counts = $this->database->get_status_counts();
+            $sync_stats['final_status_counts'] = $status_counts;
+            
+            error_log('FAHRPLANPORTAL: Synchronisation abgeschlossen - Stats: ' . json_encode($sync_stats));
+            
+            wp_send_json_success(array(
+                'message' => 'Synchronisation erfolgreich abgeschlossen',
+                'stats' => $sync_stats,
+                'two_stage' => true
+            ));
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: Sync-Fehler: ' . $e->getMessage());
+            $sync_stats['errors']++;
+            wp_send_json_error('Synchronisation fehlgeschlagen: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * ✅ NEU: Hilfsfunktion - Neue PDFs in Ordner finden
+     */
+    private function find_new_pdfs_in_folder($folder_name) {
+        $new_pdfs = array();
+        $base_scan_path = ABSPATH . 'fahrplaene/' . $folder_name . '/';
+        
+        if (!is_dir($base_scan_path)) {
+            return $new_pdfs;
+        }
+        
+        // Verwende bestehende Parser-Funktion
+        $all_files = $this->parser->collect_all_scan_files($base_scan_path, $folder_name);
+        
+        // Prüfe welche PDFs noch nicht in DB sind
+        foreach ($all_files as $file_info) {
+            $relative_path = $folder_name . '/' . $file_info['relative_path'];
+            
+            // Prüfe ob bereits in DB
+            $existing = $this->database->get_fahrplan_by_path($relative_path);
+            
+            if (!$existing) {
+                $new_pdfs[] = $file_info;
+            }
+        }
+        
+        return $new_pdfs;
+    }
+    
+    /**
+     * ✅ NEU: Einzelnes PDF importieren
+     */
+    public function unified_import_single_pdf() {
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        $pdf_path = sanitize_text_field($_POST['pdf_path'] ?? '');
+        
+        if (empty($pdf_path)) {
+            wp_send_json_error('PDF-Pfad fehlt');
+            return;
+        }
+        
+        error_log('FAHRPLANPORTAL: Start unified_import_single_pdf für: ' . $pdf_path);
+        
+        try {
+            $full_path = ABSPATH . 'fahrplaene/' . $pdf_path;
+            
+            if (!file_exists($full_path)) {
+                wp_send_json_error('PDF-Datei nicht gefunden: ' . $pdf_path);
+                return;
+            }
+            
+            // Ordner und Datei-Info extrahieren
+            $path_parts = explode('/', $pdf_path);
+            $folder = $path_parts[0];
+            $filename = basename($pdf_path);
+            
+            // Region bestimmen
+            $region = '';
+            if (count($path_parts) > 2) {
+                $region = $path_parts[1];
+            }
+            
+            // File-Info für Parser erstellen
+            $file_info = array(
+                'filename' => $filename,
+                'filepath' => $full_path,
+                'relative_path' => implode('/', array_slice($path_parts, 1)),
+                'region' => $region ?: 'Hauptverzeichnis'
+            );
+            
+            // Verwende bestehende Parser-Funktionen
+            $parsed_data = $this->parser->parse_single_pdf($file_info, $folder);
+            
+            if ($parsed_data) {
+                // In DB speichern
+                $result = $this->database->insert_fahrplan($parsed_data);
+                
+                if ($result) {
+                    error_log('FAHRPLANPORTAL: PDF erfolgreich importiert: ' . $pdf_path);
+                    wp_send_json_success(array(
+                        'message' => 'PDF erfolgreich importiert',
+                        'data' => $parsed_data
+                    ));
+                } else {
+                    wp_send_json_error('Fehler beim Speichern in Datenbank');
+                }
+            } else {
+                wp_send_json_error('Fehler beim Parsen der PDF-Datei');
+            }
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: Import-Fehler: ' . $e->getMessage());
+            wp_send_json_error('Import fehlgeschlagen: ' . $e->getMessage());
+        }
+    }
+
+
+    /**
+     * ✅ NEU: Alle als MISSING markierte PDFs endgültig löschen
+     */
+    public function unified_delete_missing_pdfs() {
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        error_log('FAHRPLANPORTAL: Start unified_delete_missing_pdfs');
+        
+        try {
+            // Anzahl MISSING Einträge vor dem Löschen
+            $status_counts = $this->database->get_status_counts();
+            $missing_count = $status_counts['MISSING'];
+            
+            if ($missing_count === 0) {
+                wp_send_json_success(array(
+                    'message' => 'Keine fehlenden PDFs zum Löschen gefunden',
+                    'deleted_count' => 0
+                ));
+                return;
+            }
+            
+            // Löschen ausführen
+            $deleted_count = $this->database->delete_missing_fahrplaene();
+            
+            if ($deleted_count !== false) {
+                error_log("FAHRPLANPORTAL: {$deleted_count} fehlende PDFs gelöscht");
+                
+                wp_send_json_success(array(
+                    'message' => "Erfolgreich {$deleted_count} fehlende PDF-Einträge gelöscht",
+                    'deleted_count' => $deleted_count
+                ));
+            } else {
+                wp_send_json_error('Fehler beim Löschen der fehlenden PDFs');
+            }
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: delete_missing_pdfs Fehler: ' . $e->getMessage());
+            wp_send_json_error('Löschen fehlgeschlagen: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * ✅ NEU: Liste aller MISSING PDFs abrufen
+     */
+    public function unified_get_missing_pdfs() {
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        global $wpdb;
+        
+        try {
+            $missing_pdfs = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, titel, pdf_pfad, dateiname, region, jahr 
+                     FROM {$wpdb->prefix}fahrplaene
+                     WHERE pdf_status = %s 
+                     ORDER BY jahr DESC, region ASC, titel ASC",
+                    'MISSING'
+                )
+            );
+            
+            wp_send_json_success(array(
+                'missing_pdfs' => $missing_pdfs,
+                'count' => count($missing_pdfs)
+            ));
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: get_missing_pdfs Fehler: ' . $e->getMessage());
+            wp_send_json_error('Fehler beim Laden der fehlenden PDFs: ' . $e->getMessage());
         }
     }
 

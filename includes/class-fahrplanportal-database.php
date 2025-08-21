@@ -110,6 +110,8 @@ class FahrplanPortal_Database {
                     error_log('FAHRPLANPORTAL: Tags-Spalte hinzugefügt');
                 }
             }
+
+            $this->add_pdf_status_column();
             
             error_log('✅ FAHRPLANPORTAL: Datenbank erfolgreich initialisiert (echter Admin)');
             return true;
@@ -415,6 +417,135 @@ class FahrplanPortal_Database {
             "SELECT COUNT(*) FROM {$this->table_name} 
              WHERE tags IS NOT NULL AND tags != ''"
         );
+    }
+
+
+    /**
+     * ✅ NEU: Fahrplan nach PDF-Pfad suchen
+     */
+    public function get_fahrplan_by_path($pdf_pfad) {
+        global $wpdb;
+        
+        $sql = $wpdb->prepare(
+            "SELECT * FROM {$this->table_name} WHERE pdf_pfad = %s LIMIT 1",
+            $pdf_pfad
+        );
+        
+        return $wpdb->get_row($sql);
+    }
+
+
+    /**
+     * ✅ NEU: PDF-Status Spalte zur Tabelle hinzufügen
+     * Status: 'OK', 'MISSING', 'IMPORT'
+     */
+    public function add_pdf_status_column() {
+        global $wpdb;
+        
+        try {
+            // Prüfen ob Spalte bereits existiert
+            $column_exists = $wpdb->get_results(
+                "SHOW COLUMNS FROM {$this->table_name} LIKE 'pdf_status'"
+            );
+            
+            if (empty($column_exists)) {
+                // Spalte hinzufügen
+                $sql = "ALTER TABLE {$this->table_name} 
+                        ADD COLUMN pdf_status VARCHAR(20) DEFAULT 'OK' 
+                        AFTER region";
+                
+                $result = $wpdb->query($sql);
+                
+                if ($result !== false) {
+                    error_log('FAHRPLANPORTAL: pdf_status Spalte erfolgreich hinzugefügt');
+                    
+                    // Alle bestehenden Einträge auf 'OK' setzen
+                    $wpdb->query("UPDATE {$this->table_name} SET pdf_status = 'OK' WHERE pdf_status IS NULL");
+                    
+                    return true;
+                } else {
+                    error_log('FAHRPLANPORTAL: Fehler beim Hinzufügen der pdf_status Spalte: ' . $wpdb->last_error);
+                    return false;
+                }
+            } else {
+                error_log('FAHRPLANPORTAL: pdf_status Spalte existiert bereits');
+                return true;
+            }
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: Exception beim Hinzufügen der pdf_status Spalte: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * ✅ NEU: PDF-Status für bestimmte ID setzen
+     */
+    public function update_pdf_status($id, $status) {
+        global $wpdb;
+        
+        $allowed_statuses = array('OK', 'MISSING', 'IMPORT');
+        
+        if (!in_array($status, $allowed_statuses)) {
+            error_log('FAHRPLANPORTAL: Ungültiger pdf_status: ' . $status);
+            return false;
+        }
+        
+        $result = $wpdb->update(
+            $this->table_name,
+            array('pdf_status' => $status),
+            array('id' => $id),
+            array('%s'),
+            array('%d')
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * ✅ NEU: Alle Einträge mit Status MISSING löschen
+     */
+    public function delete_missing_fahrplaene() {
+        global $wpdb;
+        
+        $result = $wpdb->delete(
+            $this->table_name,
+            array('pdf_status' => 'MISSING'),
+            array('%s')
+        );
+        
+        if ($result !== false) {
+            error_log('FAHRPLANPORTAL: ' . $result . ' fehlende PDFs aus Datenbank gelöscht');
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * ✅ NEU: Anzahl Einträge nach Status abfragen
+     */
+    public function get_status_counts() {
+        global $wpdb;
+        
+        $results = $wpdb->get_results(
+            "SELECT pdf_status, COUNT(*) as count 
+             FROM {$this->table_name} 
+             GROUP BY pdf_status"
+        );
+        
+        $counts = array(
+            'OK' => 0,
+            'MISSING' => 0,
+            'IMPORT' => 0
+        );
+        
+        foreach ($results as $row) {
+            if (isset($counts[$row->pdf_status])) {
+                $counts[$row->pdf_status] = intval($row->count);
+            }
+        }
+        
+        return $counts;
     }
 
 }

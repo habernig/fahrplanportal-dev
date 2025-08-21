@@ -1122,8 +1122,8 @@ function initializeFahrplanportalAdmin() {
         };
         
         try {
-            var tagsColumnIndex = pdfParsingEnabled ? 10 : -1;
-            var actionsColumnIndex = pdfParsingEnabled ? 11 : 10;
+            var tagsColumnIndex = pdfParsingEnabled ? 11 : -1;
+            var actionsColumnIndex = pdfParsingEnabled ? 12 : 11;
             
             console.log('FAHRPLANPORTAL: Admin DataTables - Tags-Index:', tagsColumnIndex, 'Aktionen-Index:', actionsColumnIndex);
             
@@ -1134,23 +1134,24 @@ function initializeFahrplanportalAdmin() {
                 "responsive": true,
                 "lengthMenu": [ 10, 25, 50, 200, -1 ],
                 "pageLength": 200,
-                "order": [[ 7, "asc" ]],
+                "order": [[ 8, "asc" ]],
                 "scrollX": false,
                 "columnDefs": [
                     { "orderable": false, "targets": [actionsColumnIndex] },
-                    { "width": "50px", "targets": [0] },
-                    { "width": "80px", "targets": [1, 2] },
-                    { "width": "auto", "targets": [3] },
+                    { "width": "50px", "targets": [0] },          // ID
+                    { "width": "80px", "targets": [1, 2] },       // Linie Alt, Linie Neu
+                    { "width": "auto", "targets": [3] },          // Titel
                     { 
                         "width": "90px", 
-                        "targets": [4, 5],
+                        "targets": [4, 5],                        // Gültig von, Gültig bis
                         "type": "date-de"
                     },
-                    { "width": "70px", "targets": [6] },
-                    { "width": "100px", "targets": [7] },
-                    { "width": "50px", "targets": [8] },
-                    { "width": "150px", "targets": [9] },
-                    { "width": "120px", "targets": [actionsColumnIndex] }
+                    { "width": "80px", "targets": [6] },          // Status (NEU)
+                    { "width": "70px", "targets": [7] },          // Ordner
+                    { "width": "100px", "targets": [8] },         // Region
+                    { "width": "50px", "targets": [9] },          // PDF
+                    { "width": "150px", "targets": [10] },        // Kurzbeschreibung
+                    { "width": "120px", "targets": [actionsColumnIndex] } // Aktionen
                 ],
                 "initComplete": function() {
                     populateAdminRegionFilter();
@@ -1825,6 +1826,358 @@ function initializeFahrplanportalAdmin() {
             },
             error: function(error) {
                 alert('Admin Fehler: ' + error.message);
+            }
+        });
+    });
+
+
+    // ========================================
+    // ✅ NEU: TABELLE SYNCHRONISIERUNG
+    // ========================================
+    
+    // Button Handler für "Tabelle aktualisieren"
+    $('#update-table-status').on('click', function() {
+        syncTableWithFolders();
+    });
+
+    // ========================================
+    // ✅ NEU: FEHLENDE PDFs VERWALTEN
+    // ========================================
+    
+    // Button Handler für "Fehlende PDFs löschen"
+    $('#delete-missing-pdfs').on('click', function() {
+        if (!confirm('Wirklich alle als fehlend markierten PDFs aus der Datenbank löschen?\n\nDiese Aktion kann nicht rückgängig gemacht werden!')) {
+            return;
+        }
+        
+        deleteMissingPdfs();
+    });
+    
+    // Button Handler für "Details anzeigen"
+    $('#show-missing-details').on('click', function() {
+        var $detailsContainer = $('#missing-pdfs-details');
+        
+        if ($detailsContainer.is(':visible')) {
+            // Details verstecken
+            $detailsContainer.slideUp();
+            $(this).html('<span class="dashicons dashicons-visibility" style="vertical-align: middle; margin-right: 5px;"></span>Details anzeigen');
+        } else {
+            // Details anzeigen
+            loadMissingPdfsDetails();
+        }
+    });
+    
+    // Funktion: Fehlende PDFs endgültig löschen
+    function deleteMissingPdfs() {
+        var $btn = $('#delete-missing-pdfs');
+        var $status = $('#status-update-info');
+        
+        if ($btn.prop('disabled')) {
+            return;
+        }
+        
+        // Button deaktivieren
+        $btn.prop('disabled', true);
+        $btn.html('<span class="dashicons dashicons-update-alt" style="animation: spin 1s linear infinite; vertical-align: middle; margin-right: 5px;"></span>Lösche...');
+        $status.html('<span style="color: orange;">🗑️ Lösche fehlende PDFs aus Datenbank...</span>');
+        
+        console.log('🗑️ FAHRPLANPORTAL: Starte Löschung fehlender PDFs');
+        
+        fahrplanAdminCall('delete_missing_pdfs', {}, {
+            success: function(response) {
+                console.log('✅ FAHRPLANPORTAL: Fehlende PDFs gelöscht:', response);
+                
+                // Button zurücksetzen und verstecken
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-trash" style="vertical-align: middle; margin-right: 5px;"></span>Fehlende PDFs löschen');
+                $btn.hide();
+                $('#show-missing-details').hide();
+                $('#missing-pdfs-details').hide();
+                
+                // Erfolgs-Nachricht
+                var message = '✅ Löschung abgeschlossen:<br>';
+                message += '🗑️ ' + response.deleted_count + ' fehlende PDFs gelöscht<br>';
+                
+                $status.html('<span style="color: green;">' + message + '</span>');
+                
+                // Fehlende Zeilen aus Tabelle entfernen
+                $('#fahrplaene-table tbody tr').each(function() {
+                    var $row = $(this);
+                    if ($row.data('pdf-status') === 'MISSING') {
+                        $row.fadeOut(500, function() {
+                            $row.remove();
+                        });
+                    }
+                });
+                
+                // Nach 3 Sekunden Seite neu laden
+                setTimeout(function() {
+                    if (confirm('Fehlende PDFs erfolgreich gelöscht!\n\nSeite neu laden um die Änderungen vollständig zu sehen?')) {
+                        location.reload();
+                    }
+                }, 3000);
+            },
+            error: function(error) {
+                console.error('❌ FAHRPLANPORTAL: Lösch-Fehler:', error);
+                
+                // Button zurücksetzen
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-trash" style="vertical-align: middle; margin-right: 5px;"></span>Fehlende PDFs löschen');
+                
+                $status.html('<span style="color: red;">❌ Löschung fehlgeschlagen: ' + error.message + '</span>');
+            }
+        });
+    }
+    
+    // Funktion: Details der fehlenden PDFs laden und anzeigen
+    function loadMissingPdfsDetails() {
+        var $detailsContainer = $('#missing-pdfs-details');
+        var $listContainer = $('#missing-pdfs-list');
+        var $btn = $('#show-missing-details');
+        
+        // Loading-Zustand
+        $btn.prop('disabled', true);
+        $listContainer.html('<div style="text-align: center; padding: 10px;">⏳ Lade Details...</div>');
+        $detailsContainer.slideDown();
+        
+        console.log('📋 FAHRPLANPORTAL: Lade Details fehlender PDFs');
+        
+        fahrplanAdminCall('get_missing_pdfs', {}, {
+            success: function(response) {
+                console.log('✅ FAHRPLANPORTAL: Fehlende PDFs Details geladen:', response);
+                
+                var html = '';
+                
+                if (response.missing_pdfs && response.missing_pdfs.length > 0) {
+                    response.missing_pdfs.forEach(function(pdf) {
+                        html += '<div style="margin-bottom: 5px; padding: 5px; background: rgba(255,255,255,0.5); border-radius: 3px;">';
+                        html += '<strong>' + pdf.jahr + '/' + pdf.region + ':</strong> ';
+                        html += pdf.titel + ' (' + pdf.dateiname + ')';
+                        html += '<br><small style="color: #666;">Pfad: ' + pdf.pdf_pfad + '</small>';
+                        html += '</div>';
+                    });
+                } else {
+                    html = '<div style="text-align: center; color: #666;">Keine fehlenden PDFs gefunden.</div>';
+                }
+                
+                $listContainer.html(html);
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-hidden" style="vertical-align: middle; margin-right: 5px;"></span>Details verstecken');
+            },
+            error: function(error) {
+                console.error('❌ FAHRPLANPORTAL: Details-Fehler:', error);
+                
+                $listContainer.html('<div style="color: red; text-align: center;">❌ Fehler beim Laden: ' + error.message + '</div>');
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-visibility" style="vertical-align: middle; margin-right: 5px;"></span>Details anzeigen');
+            }
+        });
+    }
+    
+    // Hauptfunktion: Tabelle mit Ordnern synchronisieren (ERWEITERT für zweistufige Synchronisation)
+    function syncTableWithFolders() {
+        var $btn = $('#update-table-status');
+        var $status = $('#status-update-info');
+        
+        if ($btn.prop('disabled')) {
+            return;
+        }
+        
+        // Button deaktivieren und Status anzeigen
+        $btn.prop('disabled', true);
+        $btn.html('<span class="dashicons dashicons-update-alt" style="animation: spin 1s linear infinite; vertical-align: middle; margin-right: 5px;"></span>Synchronisiere...');
+        $status.html('<span style="color: orange;">🔄 Überprüfe DB gegen physikalische Ordner...</span>');
+        
+        console.log('🔄 FAHRPLANPORTAL: Starte zweistufige Tabellen-Synchronisation');
+        
+        fahrplanAdminCall('sync_table', {}, {
+            success: function(response) {
+                console.log('✅ FAHRPLANPORTAL: Synchronisation erfolgreich:', response);
+                
+                // Button zurücksetzen
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>Tabelle aktualisieren');
+                
+                // Erfolgs-Nachricht mit Details
+                var message = '✅ Synchronisation abgeschlossen:<br>';
+                message += '📊 ' + response.stats.total_db_entries + ' DB-Einträge geprüft<br>';
+                message += '✅ ' + response.stats.status_ok + ' PDFs OK<br>';
+                
+                if (response.stats.marked_missing > 0) {
+                    message += '❌ ' + response.stats.marked_missing + ' PDFs als fehlend markiert<br>';
+                }
+                
+                if (response.stats.already_missing > 0) {
+                    message += '⚠️ ' + response.stats.already_missing + ' bereits als fehlend bekannt<br>';
+                }
+                
+                if (response.stats.marked_import > 0) {
+                    message += '🆕 ' + response.stats.marked_import + ' neue PDFs gefunden<br>';
+                }
+                
+                if (response.stats.errors > 0) {
+                    message += '❌ ' + response.stats.errors + ' Fehler<br>';
+                }
+                
+                $status.html('<span style="color: green;">' + message + '</span>');
+                
+                // Zeige/verstecke "Fehlende PDFs löschen" Button
+                var totalMissing = response.stats.status_missing || 0;
+                if (totalMissing > 0) {
+                    $('#delete-missing-pdfs').show();
+                    $('#show-missing-details').show();
+                    $('#delete-missing-pdfs').html('<span class="dashicons dashicons-trash" style="vertical-align: middle; margin-right: 5px;"></span>Fehlende PDFs löschen (' + totalMissing + ')');
+                } else {
+                    $('#delete-missing-pdfs').hide();
+                    $('#show-missing-details').hide();
+                    $('#missing-pdfs-details').hide();
+                }
+                
+                // Status in Tabelle aktualisieren
+                updateTableStatusAfterSync(response.stats);
+                
+                // Bei neuen PDFs Info anzeigen
+                if (response.stats.marked_import > 0) {
+                    setTimeout(function() {
+                        alert('Hinweis: ' + response.stats.marked_import + ' neue PDFs gefunden.\n\nVerwenden Sie "Verzeichnis scannen" um diese zu importieren.');
+                    }, 2000);
+                }
+            },
+            error: function(error) {
+                console.error('❌ FAHRPLANPORTAL: Synchronisation-Fehler:', error);
+                
+                // Button zurücksetzen
+                $btn.prop('disabled', false);
+                $btn.html('<span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>Tabelle aktualisieren');
+                
+                $status.html('<span style="color: red;">❌ Synchronisation fehlgeschlagen: ' + error.message + '</span>');
+            }
+        });
+    }
+    
+
+    // ========================================
+    // ✅ NEU: AUTOMATISCHE STATUS-PRÜFUNG BEIM SEITENLADEN
+    // ========================================
+    
+    // Funktion zum automatischen Setzen des Status beim Laden
+    function autoCheckTableStatus() {
+        console.log('🔄 FAHRPLANPORTAL: Auto-Status-Check gestartet');
+        
+        // Alle Status-Zellen finden die noch "Laden..." anzeigen
+        $('[id^="status-"]').each(function() {
+            var $statusCell = $(this);
+            var $loadingSpan = $statusCell.find('.status-loading');
+            
+            // Nur Zellen mit "Laden..." Status bearbeiten
+            if ($loadingSpan.length > 0) {
+                var $row = $statusCell.closest('tr');
+                var $pdfLink = $row.find('a[href*=".pdf"]');
+                
+                if ($pdfLink.length > 0) {
+                    // PDF-Link vorhanden → Status OK
+                    $statusCell.html('<span class="status-ok">✅ OK</span>');
+                } else {
+                    // Kein PDF-Link → Status prüfen (sollte nicht vorkommen nach Sync)
+                    $statusCell.html('<span class="status-checking">🔍 Prüfen</span>');
+                }
+            }
+        });
+        
+        console.log('✅ FAHRPLANPORTAL: Auto-Status-Check abgeschlossen');
+    }
+    
+    // Auto-Status-Check beim Laden der DataTables
+    $(document).ready(function() {
+        // Verzögerung um sicherzustellen dass DataTables geladen ist
+        setTimeout(function() {
+            if ($('#fahrplaene-table').length > 0) {
+                autoCheckTableStatus();
+            }
+        }, 1000);
+    });
+    
+    // Status in bestehender Tabelle nach Sync aktualisieren
+    function updateTableStatusAfterSync(stats) {
+        console.log('🔄 FAHRPLANPORTAL: Aktualisiere Status in Tabelle nach Sync');
+        
+        // Alle Zeilen durchgehen und Status basierend auf data-pdf-status setzen
+        $('#fahrplaene-table tbody tr').each(function() {
+            var $row = $(this);
+            var $statusCell = $row.find('[id^="status-"]');
+            var pdfStatus = $row.data('pdf-status') || 'OK';
+            
+            // Status entsprechend setzen
+            switch (pdfStatus) {
+                case 'OK':
+                    $statusCell.html('<span class="status-ok">✅ OK</span>');
+                    break;
+                case 'MISSING':
+                    $statusCell.html('<span class="status-missing">❌ Fehlt</span>');
+                    $row.addClass('pdf-missing');
+                    break;
+                case 'IMPORT':
+                    var pdfPath = $statusCell.find('.status-import').data('pdf-path') || '';
+                    $statusCell.html('<span class="status-import" data-pdf-path="' + pdfPath + '">📥 Import</span>');
+                    break;
+                default:
+                    $statusCell.html('<span class="status-loading">⏳ Laden...</span>');
+                    break;
+            }
+        });
+        
+        console.log('✅ FAHRPLANPORTAL: Status-Update abgeschlossen');
+    }
+    
+    // Click-Handler für "import"-Status (einzelnes PDF importieren)
+    $(document).on('click', '.status-import', function(e) {
+        e.preventDefault();
+        var $importBtn = $(this);
+        var $row = $importBtn.closest('tr');
+        var pdfPath = $importBtn.data('pdf-path');
+        
+        if (!pdfPath) {
+            alert('PDF-Pfad nicht gefunden');
+            return;
+        }
+        
+        if (!confirm('PDF "' + pdfPath + '" jetzt importieren?')) {
+            return;
+        }
+        
+        // Import-Button deaktivieren
+        $importBtn.removeClass('status-import').addClass('status-importing');
+        $importBtn.html('<span style="color: orange;">⏳ Importiere...</span>');
+        $importBtn.css('cursor', 'default');
+        
+        console.log('🔄 FAHRPLANPORTAL: Starte Einzel-PDF-Import:', pdfPath);
+        
+        fahrplanAdminCall('import_single_pdf', {
+            pdf_path: pdfPath
+        }, {
+            success: function(response) {
+                console.log('✅ FAHRPLANPORTAL: PDF erfolgreich importiert:', response);
+                
+                // Status auf OK setzen
+                $importBtn.removeClass('status-importing');
+                $importBtn.html('<span style="color: green; font-weight: bold;">✅ OK</span>');
+                
+                // Nach 2 Sekunden Seite neu laden
+                setTimeout(function() {
+                    if (confirm('PDF erfolgreich importiert!\n\nSeite neu laden um die neuen Daten zu sehen?')) {
+                        location.reload();
+                    }
+                }, 2000);
+            },
+            error: function(error) {
+                console.error('❌ FAHRPLANPORTAL: PDF-Import-Fehler:', error);
+                
+                // Status auf Fehler setzen
+                $importBtn.removeClass('status-importing');
+                $importBtn.html('<span style="color: red;">❌ Fehler</span>');
+                $importBtn.css('cursor', 'default');
+                
+                alert('Import fehlgeschlagen: ' + error.message);
             }
         });
     });

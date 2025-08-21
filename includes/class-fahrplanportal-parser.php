@@ -437,4 +437,40 @@ class FahrplanPortal_Parser {
         
         return $parsed;
     }
+
+
+    /**
+     * ✅ NEU: Einzelnes PDF für Import-Funktion parsen
+     * Wrapper für process_single_pdf_file() mit angepasster file_info Struktur
+     */
+    public function parse_single_pdf($file_info, $folder) {
+        error_log('FAHRPLANPORTAL: parse_single_pdf aufgerufen für: ' . $file_info['filename']);
+        
+        try {
+            // file_info Struktur an process_single_pdf_file() anpassen
+            $adapted_file_info = array(
+                'filename' => $file_info['filename'],
+                'folder' => $folder,
+                'region' => $file_info['region'] ?? '',
+                'full_path' => $file_info['filepath'] ?? '',
+                'relative_path' => $file_info['relative_path'] ?? ''
+            );
+            
+            // Bestehende Funktion verwenden
+            $result = $this->process_single_pdf_file($adapted_file_info);
+            
+            if ($result['success']) {
+                error_log('FAHRPLANPORTAL: parse_single_pdf erfolgreich für: ' . $file_info['filename']);
+                return $result['data']; // Nur die Daten zurückgeben
+            } else {
+                error_log('FAHRPLANPORTAL: parse_single_pdf fehlgeschlagen für: ' . $file_info['filename']);
+                return false;
+            }
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: parse_single_pdf Exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
 }

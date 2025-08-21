@@ -243,16 +243,36 @@ class FahrplanPortal_Admin {
                     <button type="button" id="clear-filter" class="button button-secondary">Filter zurücksetzen</button>
                 </div>
 
-                <!-- ✅ NEU: Tabelle Status Aktualisierung -->
+                <!-- ✅ NEU: Tabelle Status Aktualisierung - ERWEITERT für zweistufige Synchronisation -->
                 <div style="margin: 20px 0; border-top: 1px solid #ddd; padding-top: 20px;">
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                         <button type="button" id="update-table-status" class="button button-secondary">
                             <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
                             Tabelle aktualisieren
                         </button>
+                        <button type="button" id="delete-missing-pdfs" class="button button-secondary" style="background: #dc3545; border-color: #dc3545; color: white; display: none;">
+                            <span class="dashicons dashicons-trash" style="vertical-align: middle; margin-right: 5px;"></span>
+                            Fehlende PDFs löschen
+                        </button>
+                        <button type="button" id="show-missing-details" class="button button-link" style="display: none;">
+                            <span class="dashicons dashicons-visibility" style="vertical-align: middle; margin-right: 5px;"></span>
+                            Details anzeigen
+                        </button>
                         <span id="status-update-info" style="color: #666; font-size: 14px;">
                             Überprüft PDF-Status und findet neue Dateien
                         </span>
+                    </div>
+                    
+                    <!-- ✅ NEU: Details-Container für fehlende PDFs -->
+                    <div id="missing-pdfs-details" style="display: none; margin-top: 15px; padding: 15px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                        <h4 style="margin: 0 0 10px 0; color: #856404;">Fehlende PDFs</h4>
+                        <div id="missing-pdfs-list" style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #856404;">
+                            <!-- Wird von JavaScript gefüllt -->
+                        </div>
+                        <p style="margin: 10px 0 0 0; font-size: 13px; color: #856404;">
+                            <strong>Hinweis:</strong> Diese Dateien wurden im Dateisystem nicht gefunden. 
+                            Klicken Sie "Fehlende PDFs löschen" um sie endgültig aus der Datenbank zu entfernen.
+                        </p>
                     </div>
                 </div>
                 
@@ -997,18 +1017,35 @@ ST3:STADT3
                 $tags_column = '<td>' . $tags_display . '</td>';
             }
             
-            // NEUE REIHENFOLGE: ID, Linie Alt, Linie Neu, Titel, Gültig von, Gültig bis, Ordner, Region, PDF, Kurzbeschreibung, [Tags], Aktionen
+            // ✅ ERWEITERT: Status-Spalte basierend auf pdf_status
+            $pdf_status = $row->pdf_status ?? 'OK';
+            $status_display = '';
+            
+            switch ($pdf_status) {
+                case 'OK':
+                    $status_display = '<span class="status-ok">✅ OK</span>';
+                    break;
+                case 'MISSING':
+                    $status_display = '<span class="status-missing">❌ Fehlt</span>';
+                    break;
+                case 'IMPORT':
+                    $status_display = '<span class="status-import" data-pdf-path="' . esc_attr($row->pdf_pfad) . '">📥 Import</span>';
+                    break;
+                default:
+                    $status_display = '<span class="status-loading">⏳ Laden...</span>';
+                    break;
+            }
+            
+            // NEUE REIHENFOLGE: ID, Linie Alt, Linie Neu, Titel, Gültig von, Gültig bis, Status, Ordner, Region, PDF, Kurzbeschreibung, [Tags], Aktionen
             $output .= sprintf(
-                '<tr data-id="%d">
+                '<tr data-id="%d" data-pdf-status="%s">
                     <td>%d</td>
                     <td>%s</td>
                     <td>%s</td>
                     <td>%s</td>
                     <td>%s</td>
                     <td>%s</td>
-                    <td id="status-%d">
-                        <span class="status-loading">⏳ Laden...</span>
-                    </td>
+                    <td id="status-%d">%s</td>
                     <td>%s</td>
                     <td>%s</td>
                     <td><a href="%s" target="_blank"><span class="dashicons dashicons-media-document"></span></a></td>
@@ -1024,6 +1061,7 @@ ST3:STADT3
                     </td>
                 </tr>',
                 $row->id,                    // ID
+                esc_attr($pdf_status),       // data-pdf-status
                 $row->id,                    // ID (nochmal für Anzeige)
                 esc_html($row->linie_alt),   // Linie Alt
                 esc_html($row->linie_neu),   // Linie Neu  
@@ -1031,6 +1069,7 @@ ST3:STADT3
                 esc_html($gueltig_von_de),   // Gültig von
                 esc_html($gueltig_bis_de),   // Gültig bis
                 $row->id,                    // Status id
+                $status_display,             // Status Display (ERWEITERT)
                 esc_html($row->jahr),        // Ordner
                 esc_html($region),           // Region
                 esc_url($pdf_url),           // PDF
