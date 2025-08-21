@@ -402,7 +402,12 @@ class FahrplanportalShortcode {
         }, $results);
     }
     
-    // ✅ GEÄNDERT: Unterstützt jetzt 2-4 stellige Nummern
+    
+    /**
+     * ✅ BUGFIX: Frontend Liniennummern für Autosuggestion extrahieren
+     * ✅ ERWEITERT: Unterstützt jetzt auch alphanumerische Liniennummern (X1, X2, SB1, etc.)
+     * ✅ ORIGINAL PROBLEM: RegEx '/^\d{2,4}$/' hat nur numerische Werte akzeptiert
+     */
     private function extract_frontend_line_numbers($search_param, $wpdb) {
         // ✅ NEU: Gültigkeitsprüfung in SQL
         $today = date('Y-m-d');
@@ -430,13 +435,50 @@ class FahrplanportalShortcode {
             $line_parts = explode(',', $result->line_number);
             foreach ($line_parts as $line) {
                 $line = trim($line);
-                // ✅ GEÄNDERT: Akzeptiert jetzt 2-4 stellige Nummern
-                if (!empty($line) && preg_match('/^\d{2,4}$/', $line)) {
+                
+                // ✅ BUGFIX: Erweiterte RegEx für alphanumerische Liniennummern
+                // VORHER: Nur '/^\d{2,4}$/' (nur 2-4 stellige Zahlen)
+                // NACHHER: Unterstützt auch X1, X2, X3, SB1, etc.
+                if (!empty($line) && $this->is_valid_line_number($line)) {
                     $lines[] = array('line' => $line, 'count' => $result->count);
                 }
             }
         }
         return $lines;
+    }
+    
+    /**
+     * ✅ NEU: Prüft ob eine Bezeichnung eine gültige Liniennummer ist
+     * Unterstützt sowohl numerische als auch alphanumerische Formate
+     */
+    private function is_valid_line_number($line) {
+        // Leere oder zu kurze Werte ausschließen
+        if (empty($line) || strlen($line) < 1) {
+            return false;
+        }
+        
+        // 1. Rein numerische Liniennummern (2-4 stellig)
+        if (preg_match('/^\d{2,4}$/', $line)) {
+            return true;
+        }
+        
+        // 2. Buchstaben-Zahl-Kombinationen (X1, X2, X3, SB1, etc.)
+        if (preg_match('/^[A-Z]{1,3}\d{1,3}$/i', $line)) {
+            return true;
+        }
+        
+        // 3. Einzelne Buchstaben (A, B, C, etc.)
+        if (preg_match('/^[A-Z]$/i', $line)) {
+            return true;
+        }
+        
+        // 4. Spezielle Kombinationen mit Bindestrichen (Lin-1, Lin-2, etc.)
+        if (preg_match('/^[A-Z]{2,5}-\d{1,3}$/i', $line)) {
+            return true;
+        }
+        
+        // Alle anderen Formate werden nicht als Liniennummern erkannt
+        return false;
     }
     
     private function extract_frontend_title_words($search_param, $wpdb) {
