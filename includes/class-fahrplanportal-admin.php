@@ -162,6 +162,19 @@ class FahrplanPortal_Admin {
                     </p>
                 <?php endif; ?>
             </div>
+
+            <!-- ✅ NEU: Tabelle Status Aktualisierung -->
+            <div style="margin: 20px 0; border-top: 1px solid #ddd; padding-top: 20px;">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <button type="button" id="update-table-status" class="button button-secondary">
+                        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
+                        Tabelle aktualisieren
+                    </button>
+                    <span id="status-update-info" style="color: #666; font-size: 14px;">
+                        Überprüft PDF-Status und findet neue Dateien
+                    </span>
+                </div>
+            </div>
             
             <!-- ✅ NEU: Chunked Progress Bar -->
             <div id="scan-progress-container" style="display: none;">
@@ -247,6 +260,7 @@ class FahrplanPortal_Admin {
                     <thead>
                         <tr>
                             <th>ID</th>
+                            <th>Status</th>
                             <th>Linie Alt</th>
                             <th>Linie Neu</th>
                             <th>Titel</th>
@@ -958,7 +972,7 @@ ST3:STADT3
     private function get_fahrplaene_rows() {
         $results = $this->database->get_all_fahrplaene();
         
-        $colspan = $this->pdf_parsing_enabled ? 12 : 11;
+        $colspan = $this->pdf_parsing_enabled ? 13 : 12;
         
         if (empty($results)) {
             return '<tr><td colspan="' . $colspan . '">Keine Fahrpläne gefunden. Verwenden Sie "Verzeichnis scannen".</td></tr>';
@@ -986,6 +1000,9 @@ ST3:STADT3
             $output .= sprintf(
                 '<tr data-id="%d">
                     <td>%d</td>
+                    <td id="status-%d">
+                        <span class="status-loading">⏳ Laden...</span>
+                    </td>
                     <td>%s</td>
                     <td>%s</td>
                     <td>%s</td>
@@ -1007,6 +1024,7 @@ ST3:STADT3
                 </tr>',
                 $row->id,                    // ID
                 $row->id,                    // ID (nochmal für Anzeige)
+                $row->id,                    // Status id
                 esc_html($row->linie_alt),   // Linie Alt
                 esc_html($row->linie_neu),   // Linie Neu  
                 esc_html($row->titel),       // Titel
