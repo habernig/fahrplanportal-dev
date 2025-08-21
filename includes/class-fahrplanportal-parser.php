@@ -25,42 +25,61 @@ class FahrplanPortal_Parser {
     }
     
     /**
-     * ✅ HILFSMETHODE: Alle Scan-Dateien sammeln
+     * ✅ VERBESSERT: Alle Scan-Dateien sammeln (mit Debug-Logging)
      */
     public function collect_all_scan_files($base_scan_path, $folder) {
         $all_files = array();
         
+        error_log('FAHRPLANPORTAL: DEBUG PARSER - collect_all_scan_files aufgerufen');
+        error_log('FAHRPLANPORTAL: DEBUG PARSER - Base path: ' . $base_scan_path);
+        error_log('FAHRPLANPORTAL: DEBUG PARSER - Folder: ' . $folder);
+        
         // Direkte PDFs im Hauptordner
         $direct_pdfs = glob($base_scan_path . '*.pdf');
+        error_log('FAHRPLANPORTAL: DEBUG PARSER - Direkte PDFs gefunden: ' . count($direct_pdfs));
+        
         foreach ($direct_pdfs as $file) {
-            $all_files[] = array(
+            $file_info = array(
                 'full_path' => $file,
                 'filename' => basename($file),
                 'folder' => $folder,
                 'region' => ''
             );
+            $all_files[] = $file_info;
+            error_log('FAHRPLANPORTAL: DEBUG PARSER - Direkte PDF: ' . basename($file));
         }
         
         // Regionen-Unterordner
         $region_dirs = glob($base_scan_path . '*', GLOB_ONLYDIR);
+        error_log('FAHRPLANPORTAL: DEBUG PARSER - Regionen-Ordner gefunden: ' . count($region_dirs));
+        
         foreach ($region_dirs as $region_dir) {
             $region_name = basename($region_dir);
             
             // Versteckte Ordner überspringen
             if (substr($region_name, 0, 1) === '.') {
+                error_log('FAHRPLANPORTAL: DEBUG PARSER - Überspringe versteckten Ordner: ' . $region_name);
                 continue;
             }
             
+            error_log('FAHRPLANPORTAL: DEBUG PARSER - Prüfe Region: ' . $region_name);
+            
             $region_pdfs = glob($region_dir . '/*.pdf');
+            error_log('FAHRPLANPORTAL: DEBUG PARSER - PDFs in Region ' . $region_name . ': ' . count($region_pdfs));
+            
             foreach ($region_pdfs as $file) {
-                $all_files[] = array(
+                $file_info = array(
                     'full_path' => $file,
                     'filename' => basename($file),
                     'folder' => $folder,
                     'region' => $region_name
                 );
+                $all_files[] = $file_info;
+                error_log('FAHRPLANPORTAL: DEBUG PARSER - Region PDF: ' . $region_name . '/' . basename($file));
             }
         }
+        
+        error_log('FAHRPLANPORTAL: DEBUG PARSER - Gesamt gefundene Dateien: ' . count($all_files));
         
         return $all_files;
     }

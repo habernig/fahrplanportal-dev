@@ -421,17 +421,44 @@ class FahrplanPortal_Database {
 
 
     /**
-     * ✅ NEU: Fahrplan nach PDF-Pfad suchen
+     * ✅ VERBESSERT: Fahrplan nach PDF-Pfad suchen (mit Debug-Logging)
      */
     public function get_fahrplan_by_path($pdf_pfad) {
         global $wpdb;
         
+        error_log('FAHRPLANPORTAL: DEBUG - Suche Fahrplan mit Pfad: ' . $pdf_pfad);
+        
+        // Exakte Suche
         $sql = $wpdb->prepare(
             "SELECT * FROM {$this->table_name} WHERE pdf_pfad = %s LIMIT 1",
             $pdf_pfad
         );
         
-        return $wpdb->get_row($sql);
+        $result = $wpdb->get_row($sql);
+        
+        if ($result) {
+            error_log('FAHRPLANPORTAL: DEBUG - Fahrplan gefunden (exakt): ID ' . $result->id);
+            return $result;
+        }
+        
+        // ✅ FALLBACK: Suche nach Dateiname falls exakter Pfad nicht gefunden
+        $filename = basename($pdf_pfad);
+        error_log('FAHRPLANPORTAL: DEBUG - Exakter Pfad nicht gefunden, suche nach Dateiname: ' . $filename);
+        
+        $sql_filename = $wpdb->prepare(
+            "SELECT * FROM {$this->table_name} WHERE pdf_pfad LIKE %s LIMIT 1",
+            '%' . $filename
+        );
+        
+        $result_filename = $wpdb->get_row($sql_filename);
+        
+        if ($result_filename) {
+            error_log('FAHRPLANPORTAL: DEBUG - Fahrplan gefunden (Dateiname): ID ' . $result_filename->id . ', Pfad: ' . $result_filename->pdf_pfad);
+            return $result_filename;
+        }
+        
+        error_log('FAHRPLANPORTAL: DEBUG - Kein Fahrplan gefunden für: ' . $pdf_pfad);
+        return null;
     }
 
 
@@ -546,6 +573,29 @@ class FahrplanPortal_Database {
         }
         
         return $counts;
+    }
+
+    /**
+     * ✅ NEU: Alle verwendeten Ordner aus der Datenbank ermitteln
+     */
+    public function get_used_folders() {
+        global $wpdb;
+        
+        // Unique Ordner-Namen aus Jahr-Spalte extrahieren
+        $folders = $wpdb->get_col(
+            "SELECT DISTINCT jahr FROM {$this->table_name} 
+             WHERE jahr IS NOT NULL AND jahr != '' 
+             ORDER BY jahr DESC"
+        );
+        
+        if (empty($folders)) {
+            error_log('FAHRPLANPORTAL: Keine Ordner in Datenbank gefunden');
+            return array();
+        }
+        
+        error_log('FAHRPLANPORTAL: Verwendete Ordner aus DB: ' . implode(', ', $folders));
+        
+        return $folders;
     }
 
 }

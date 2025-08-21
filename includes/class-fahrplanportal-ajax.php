@@ -73,6 +73,7 @@ class FahrplanPortal_Ajax {
             'import_single_pdf' => array($this, 'unified_import_single_pdf'),
             'delete_missing_pdfs' => array($this, 'unified_delete_missing_pdfs'),
             'get_missing_pdfs' => array($this, 'unified_get_missing_pdfs'),
+            'get_all_status_updates' => array($this, 'unified_get_all_status_updates'),
         ));
         
         error_log('✅ FAHRPLANPORTAL: Admin Handler mit Tag-Analyse im Unified System registriert');
@@ -1100,7 +1101,7 @@ class FahrplanPortal_Ajax {
 
  
     /**
-     * ✅ ERWEITERT: Tabelle mit physikalischen Ordnern synchronisieren (zweistufig)
+     * ✅ GEFIXT: Tabelle mit physikalischen Ordnern synchronisieren (nur relevante Ordner)
      */
     public function unified_sync_table() {
         if (!current_user_can('edit_posts')) {
@@ -1108,7 +1109,7 @@ class FahrplanPortal_Ajax {
             return;
         }
         
-        error_log('FAHRPLANPORTAL: Start unified_sync_table (zweistufig)');
+        error_log('FAHRPLANPORTAL: Start unified_sync_table (nur relevante Ordner)');
         
         $sync_stats = array(
             'total_db_entries' => 0,
@@ -1158,27 +1159,36 @@ class FahrplanPortal_Ajax {
                 }
             }
             
-            // 3. Neue PDFs in Ordnern finden
+            // ✅ GEFIXT: 3. Nur relevante Ordner aus DB für neue PDFs scannen
+            $used_folders = $this->database->get_used_folders();
+            error_log('FAHRPLANPORTAL: Gefundene Ordner in DB: ' . implode(', ', $used_folders));
+            
             $base_path = ABSPATH . 'fahrplaene/';
-            if (is_dir($base_path)) {
-                $folders = glob($base_path . '*', GLOB_ONLYDIR);
+            
+            foreach ($used_folders as $folder_name) {
+                $folder_path = $base_path . $folder_name;
                 
-                foreach ($folders as $folder_path) {
-                    $folder_name = basename($folder_path);
+                if (!is_dir($folder_path)) {
+                    error_log('FAHRPLANPORTAL: Ordner nicht gefunden: ' . $folder_path);
+                    continue;
+                }
+                
+                error_log('FAHRPLANPORTAL: Scanne Ordner für neue PDFs: ' . $folder_name);
+                
+                // Alle PDFs in diesem Ordner finden
+                $new_pdfs = $this->find_new_pdfs_in_folder($folder_name);
+                
+                foreach ($new_pdfs as $new_pdf) {
+                    // Neues PDF als IMPORT markieren (wird später erstellt)
+                    $sync_stats['marked_import']++;
+                    $sync_stats['new_files'][] = array(
+                        'filename' => $new_pdf['filename'],
+                        'folder' => $folder_name,
+                        'region' => $new_pdf['region'],
+                        'relative_path' => $new_pdf['relative_path']
+                    );
                     
-                    // Alle PDFs in diesem Ordner finden
-                    $new_pdfs = $this->find_new_pdfs_in_folder($folder_name);
-                    
-                    foreach ($new_pdfs as $new_pdf) {
-                        // Neues PDF als IMPORT markieren (wird später erstellt)
-                        $sync_stats['marked_import']++;
-                        $sync_stats['new_files'][] = array(
-                            'filename' => $new_pdf['filename'],
-                            'folder' => $folder_name,
-                            'region' => $new_pdf['region'],
-                            'relative_path' => $new_pdf['relative_path']
-                        );
-                    }
+                    error_log('FAHRPLANPORTAL: Neues PDF registriert: ' . $new_pdf['relative_path']);
                 }
             }
             
@@ -1204,33 +1214,80 @@ class FahrplanPortal_Ajax {
     }
     
     /**
-     * ✅ NEU: Hilfsfunktion - Neue PDFs in Ordner finden
+     * ✅ VERBESSERT: Hilfsfunktion - Neue PDFs in Ordner finden (mit Debug-Logging)
      */
     private function find_new_pdfs_in_folder($folder_name) {
         $new_pdfs = array();
         $base_scan_path = ABSPATH . 'fahrplaene/' . $folder_name . '/';
         
+        error_log('FAHRPLANPORTAL: DEBUG - Suche neue PDFs in Ordner: ' . $folder_name);
+        error_log('FAHRPLANPORTAL: DEBUG - Base scan path: ' . $base_scan_path);
+        
         if (!is_dir($base_scan_path)) {
+            error_log('FAHRPLANPORTAL: DEBUG - Ordner nicht gefunden: ' . $base_scan_path);
             return $new_pdfs;
         }
         
         // Verwende bestehende Parser-Funktion
         $all_files = $this->parser->collect_all_scan_files($base_scan_path, $folder_name);
+        error_log('FAHRPLANPORTAL: DEBUG - Gefundene Dateien gesamt: ' . count($all_files));
+        
+        // Debug: Alle gefundenen Dateien loggen
+        foreach ($all_files as $index => $file_info) {
+            error_log('FAHRPLANPORTAL: DEBUG - Datei ' . $index . ': ' . json_encode($file_info));
+        }
         
         // Prüfe welche PDFs noch nicht in DB sind
         foreach ($all_files as $file_info) {
-            $relative_path = $folder_name . '/' . $file_info['relative_path'];
+            // ✅ VERBESSERT: Mehrere Pfad-Varianten prüfen
+            $possible_paths = array();
             
-            // Prüfe ob bereits in DB
-            $existing = $this->database->get_fahrplan_by_path($relative_path);
+            // Variante 1: Mit Region-Unterordner
+            if (!empty($file_info['region'])) {
+                $possible_paths[] = $folder_name . '/' . $file_info['region'] . '/' . $file_info['filename'];
+            }
+            
+            // Variante 2: Direkt im Hauptordner
+            $possible_paths[] = $folder_name . '/' . $file_info['filename'];
+            
+            // Variante 3: Nur Dateiname (falls alte Struktur)
+            $possible_paths[] = $file_info['filename'];
+            
+            error_log('FAHRPLANPORTAL: DEBUG - Prüfe Pfade für ' . $file_info['filename'] . ': ' . json_encode($possible_paths));
+            
+            $existing = null;
+            
+            // Alle möglichen Pfade prüfen
+            foreach ($possible_paths as $test_path) {
+                $existing = $this->database->get_fahrplan_by_path($test_path);
+                if ($existing) {
+                    error_log('FAHRPLANPORTAL: DEBUG - Gefunden in DB mit Pfad: ' . $test_path);
+                    break;
+                }
+            }
             
             if (!$existing) {
+                // ✅ Als neues PDF markieren - verwende den wahrscheinlichsten Pfad
+                $relative_path = !empty($file_info['region']) ? 
+                    $folder_name . '/' . $file_info['region'] . '/' . $file_info['filename'] :
+                    $folder_name . '/' . $file_info['filename'];
+                
+                $file_info['relative_path'] = $relative_path;
                 $new_pdfs[] = $file_info;
+                
+                error_log('FAHRPLANPORTAL: DEBUG - Neues PDF gefunden: ' . $relative_path);
+            } else {
+                error_log('FAHRPLANPORTAL: DEBUG - PDF bereits in DB: ' . $file_info['filename']);
             }
         }
         
+        error_log('FAHRPLANPORTAL: DEBUG - Anzahl neue PDFs in Ordner ' . $folder_name . ': ' . count($new_pdfs));
+        
         return $new_pdfs;
     }
+
+
+    
     
     /**
      * ✅ NEU: Einzelnes PDF importieren
@@ -1378,6 +1435,38 @@ class FahrplanPortal_Ajax {
         } catch (Exception $e) {
             error_log('FAHRPLANPORTAL: get_missing_pdfs Fehler: ' . $e->getMessage());
             wp_send_json_error('Fehler beim Laden der fehlenden PDFs: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * ✅ NEU: Alle aktuellen Status-Daten für JavaScript laden
+     */
+    public function unified_get_all_status_updates() {
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Keine Berechtigung');
+            return;
+        }
+        
+        error_log('FAHRPLANPORTAL: Start unified_get_all_status_updates');
+        
+        try {
+            // Alle Fahrpläne mit aktuellem Status laden
+            $all_fahrplaene = $this->database->get_all_fahrplaene();
+            $status_data = array();
+            
+            foreach ($all_fahrplaene as $fahrplan) {
+                $status_data[$fahrplan->id] = $fahrplan->pdf_status ?? 'OK';
+            }
+            
+            wp_send_json_success(array(
+                'status_data' => $status_data,
+                'total_count' => count($all_fahrplaene),
+                'message' => 'Status-Daten erfolgreich geladen'
+            ));
+            
+        } catch (Exception $e) {
+            error_log('FAHRPLANPORTAL: Fehler in get_all_status_updates: ' . $e->getMessage());
+            wp_send_json_error('Fehler beim Laden der Status-Daten: ' . $e->getMessage());
         }
     }
 
