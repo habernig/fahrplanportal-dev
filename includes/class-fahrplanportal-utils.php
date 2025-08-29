@@ -20,119 +20,112 @@ class FahrplanPortal_Utils {
      * 
      * @param string $route Die zu splittende Route (z.B. "st-michael-ob-der-gurk-tainach-voelkermarkt")
      * @return array Array mit korrekt gesplitteten Ortsteilen
-     
-     * ✅ ERWEITERTE VERSION: smart_split_route() mit zusätzlichen österreichischen Ortsnamen
-     * Neue Muster: St.Veit im Jauntal, Bad Kleinkirchheim, St.Peter am Wallersberg, Eis bei Ruden
      */
-     public function smart_split_route($route) {
-        error_log("FAHRPLANPORTAL: ============= SMART ROUTE SPLITTING =============");
-        error_log("FAHRPLANPORTAL: Input Route: '$route'");
-        
-        $result = array();
-        $route_lower = strtolower($route);
-        
-        // WICHTIG: Patterns nach LÄNGE sortiert (längste zuerst!)
-        $compound_patterns = array(
-            // ✅ LÄNGSTE Muster zuerst (5 Teile)
-            'st-michael-ob-der-gurk' => '§ST_MICHAEL_OB_DER_GURK§',
-            'feistritz-an-der-drau' => '§FEISTRITZ_AN_DER_DRAU§',         
-            'feistritz-an-der-gail' => '§FEISTRITZ_AN_DER_GAIL§',         
-            'st-veit-an-der-glan' => '§ST_VEIT_AN_DER_GLAN§',             
-            'spittal-an-der-drau' => '§SPITTAL_AN_DER_DRAU§',             
+    public function smart_split_route($route) {
+            error_log("FAHRPLANPORTAL: ============= SMART ROUTE SPLITTING =============");
+            error_log("FAHRPLANPORTAL: Input Route: '$route'");
             
-            // ✅ 4-teilige Muster
-            'st-michael-ob-bleiburg' => '§ST_MICHAEL_OB_BLEIBURG§',
-            'st-georgen-ob-murau' => '§ST_GEORGEN_OB_MURAU§',
-            'st-paul-im-lavanttal' => '§ST_PAUL_IM_LAVANTTAL§',
-            'st-veit-im-jauntal' => '§ST_VEIT_IM_JAUNTAL§',               
-            'st-peter-am-wallersberg' => '§ST_PETER_AM_WALLERSBERG§',     
-            'st.peter-am-wallersberg' => '§ST_PETER_AM_WALLERSBERG§',     // Punkt-Variante
-            'st-georgen-am-weinberg' => '§ST_GEORGEN_AM_WEINBERG§',       // ✅ NEU
-            'st-georgen-am-laengsee' => '§ST_GEORGEN_AM_LAENGSEE§',       // ✅ NEU
-            'st-georgen-am-längsee' => '§ST_GEORGEN_AM_LAENGSEE§',        // ✅ NEU: Umlaut-Variante
+            $result = array();
+            $route_lower = strtolower($route);
             
-            // ✅ 3-teilige Muster  
-            'stein-im-jauntal' => '§STEIN_IM_JAUNTAL§',
-            'an-der-glan' => '§AN_DER_GLAN§',
-            'an-der-drau' => '§AN_DER_DRAU§',
-            'ob-der-gurk' => '§OB_DER_GURK§',
-            'im-jauntal' => '§IM_JAUNTAL§',
-            'eis-bei-ruden' => '§EIS_BEI_RUDEN§',                         
-            'am-toellerberg' => '§AM_TOELLERBERG§',                       // ✅ NEU
-            'am-töllerberg' => '§AM_TOELLERBERG§',                        // ✅ NEU: Umlaut-Variante
-            'am-weinberge' => '§AM_WEINBERGE§',                           // ✅ NEU
-            'am-laengsee' => '§AM_LAENGSEE§',                             // ✅ NEU
-            'am-längsee' => '§AM_LAENGSEE§',                              // ✅ NEU: Umlaut-Variante
-            'am-wallersberg' => '§AM_WALLERSBERG§',                       // ✅ NEU
-            'am-berg' => '§AM_BERG§',                                     // ✅ NEU
-            
-            // ✅ 2-teilige Muster (MÜSSEN NACH den längeren kommen!)
-            'maria-saal' => '§MARIA_SAAL§',
-            'st-michael' => '§ST_MICHAEL§',
-            'st-veit' => '§ST_VEIT§',
-            'st-georgen' => '§ST_GEORGEN§',
-            'st-kanzian' => '§ST_KANZIAN§',
-            'st-donat' => '§ST_DONAT§',
-            'st-paul' => '§ST_PAUL§',
-            'st-andrä' => '§ST_ANDRA§',
-            'st-jakob' => '§ST_JAKOB§',
-            'st-stefan' => '§ST_STEFAN§',
-            'st-marein' => '§ST_MAREIN§',
-            'bad-kleinkirchheim' => '§BAD_KLEINKIRCHHEIM§',               
-            'bad-eisenkappel' => '§BAD_EISENKAPPEL§',                     // ✅ NEU
-        );
-        
-        // Schritt 1: Ersetze Muster SEQUENZIELL (nicht alle auf einmal!)
-        $processed_route = $route_lower;
-        $replacements = array();
-        
-        foreach ($compound_patterns as $pattern => $placeholder) {
-            if (strpos($processed_route, $pattern) !== false) {
-                // Speichere was ersetzt wurde
-                $replacements[$placeholder] = $pattern;
-                // Ersetze NUR EINMAL pro Durchlauf
-                $processed_route = str_replace($pattern, $placeholder, $processed_route);
-                error_log("FAHRPLANPORTAL: Muster ersetzt: '$pattern' → '$placeholder'");
-                error_log("FAHRPLANPORTAL: Zwischenstand: '$processed_route'");
-            }
-        }
-        
-        error_log("FAHRPLANPORTAL: Nach Muster-Ersetzung: '$processed_route'");
-        
-        // Schritt 2: Splitte am Bindestrich
-        $parts = explode('-', $processed_route);
-        
-        // Schritt 3: Verarbeite jeden Teil
-        foreach ($parts as $part) {
-            $part = trim($part);
-            
-            if (empty($part)) {
-                continue;
-            }
-            
-            // Prüfe ob es ein Platzhalter ist
-            if (strpos($part, '§') !== false && isset($replacements[$part])) {
-                $original = $replacements[$part];
+            // WICHTIG: Patterns nach LÄNGE sortiert (längste zuerst!)
+            $compound_patterns = array(
+                // LÄNGSTE Muster zuerst (5 Teile)
+                'st-michael-ob-der-gurk' => '§ST_MICHAEL_OB_DER_GURK§',
+                'feistritz-an-der-drau' => '§FEISTRITZ_AN_DER_DRAU§',
+                'feistritz-an-der-gail' => '§FEISTRITZ_AN_DER_GAIL§',
+                'st-veit-an-der-glan' => '§ST_VEIT_AN_DER_GLAN§',
+                'spittal-an-der-drau' => '§SPITTAL_AN_DER_DRAU§',
                 
-                // Zerlege den Original-String in seine Bestandteile
-                $sub_parts = explode('-', $original);
-                foreach ($sub_parts as $sub) {
-                    if (!empty($sub)) {
-                        $result[] = $sub;
-                    }
+                // 4-teilige Muster
+                'st-georgen-ob-bleiburg' => '§ST_GEORGEN_OB_BLEIBURG§',
+                'st-michael-ob-bleiburg' => '§ST_MICHAEL_OB_BLEIBURG§',
+                'st-georgen-ob-murau' => '§ST_GEORGEN_OB_MURAU§',
+                'st-paul-im-lavanttal' => '§ST_PAUL_IM_LAVANTTAL§',
+                
+                // 3-teilige Muster  
+                'lind-ob-velden' => '§LIND_OB_VELDEN§',
+                'stein-im-jauntal' => '§STEIN_IM_JAUNTAL§',
+                'an-der-glan' => '§AN_DER_GLAN§',
+                'an-der-drau' => '§AN_DER_DRAU§',
+                'ob-der-gurk' => '§OB_DER_GURK§',
+                'im-jauntal' => '§IM_JAUNTAL§',
+                
+                // 2-teilige Muster (MÜSSEN NACH den längeren kommen!)
+                'maria-saal' => '§MARIA_SAAL§',
+                'st-michael' => '§ST_MICHAEL§',
+                'st-veit' => '§ST_VEIT§',
+                'st-georgen' => '§ST_GEORGEN§',
+                'st-kanzian' => '§ST_KANZIAN§',
+                'st-donat' => '§ST_DONAT§',
+                'st-paul' => '§ST_PAUL§',
+                'st-andrä' => '§ST_ANDRA§',
+                'st-jakob' => '§ST_JAKOB§',
+                'st-stefan' => '§ST_STEFAN§',
+                'st-marein' => '§ST_MAREIN§',
+            );
+            
+            // Schritt 1: Ersetze Muster SEQUENZIELL (nicht alle auf einmal!)
+            $processed_route = $route_lower;
+            $replacements = array();
+            
+            foreach ($compound_patterns as $pattern => $placeholder) {
+                if (strpos($processed_route, $pattern) !== false) {
+                    // Speichere was ersetzt wurde
+                    $replacements[$placeholder] = $pattern;
+                    // Ersetze NUR EINMAL pro Durchlauf
+                    $processed_route = str_replace($pattern, $placeholder, $processed_route);
+                    error_log("FAHRPLANPORTAL: Muster ersetzt: '$pattern' → '$placeholder'");
+                    error_log("FAHRPLANPORTAL: Zwischenstand: '$processed_route'");
                 }
-            } else {
-                // Normaler Teil ohne Platzhalter
-                $result[] = $part;
             }
+            
+            error_log("FAHRPLANPORTAL: Nach Muster-Ersetzung: '$processed_route'");
+            
+            // Schritt 2: Splitte am Bindestrich
+            $parts = explode('-', $processed_route);
+            
+            // 🔍 DEBUG: Was kommt aus explode() raus?
+            error_log("FAHRPLANPORTAL: DEBUG - Parts nach explode(): [" . implode(', ', $parts) . "]");
+            error_log("FAHRPLANPORTAL: DEBUG - Replacements Array:");
+            foreach ($replacements as $placeholder => $original) {
+                error_log("FAHRPLANPORTAL: DEBUG - '$placeholder' => '$original'");
+            }
+            
+            // Schritt 3: Verarbeite jeden Teil
+            foreach ($parts as $part) {
+                $part = trim($part);
+                
+                if (empty($part)) {
+                    continue;
+                }
+                
+                error_log("FAHRPLANPORTAL: DEBUG - Prüfe Teil: '$part'");
+                
+                // Prüfe ob es ein Platzhalter ist
+                if (strpos($part, '§') !== false && isset($replacements[$part])) {
+                    error_log("FAHRPLANPORTAL: DEBUG - Platzhalter erkannt und gefunden in replacements!");
+                    $original = $replacements[$part];
+                    
+                    // Zerlege den Original-String in seine Bestandteile
+                    $sub_parts = explode('-', $original);
+                    foreach ($sub_parts as $sub) {
+                        if (!empty($sub)) {
+                            $result[] = $sub;
+                        }
+                    }
+                } else {
+                    error_log("FAHRPLANPORTAL: DEBUG - Kein Platzhalter oder nicht in replacements gefunden");
+                    // Normaler Teil ohne Platzhalter
+                    $result[] = $part;
+                }
+            }
+            
+            error_log("FAHRPLANPORTAL: Smart Split Ergebnis: [" . implode(', ', $result) . "]");
+            error_log("FAHRPLANPORTAL: ===========================================");
+            
+            return $result;
         }
-        
-        error_log("FAHRPLANPORTAL: Smart Split Ergebnis: [" . implode(', ', $result) . "]");
-        error_log("FAHRPLANPORTAL: ===========================================");
-        
-        return $result;
-    }
-
     
     /**
      * ✅ NEU: Exklusionsliste aus WordPress Options laden (erweitert für Tag-Analyse)
@@ -498,7 +491,7 @@ class FahrplanPortal_Utils {
         // Bestehende Ausnahmeliste...
         $exceptions = array(
             'auen', 'auenwald', 'auental', 'auendorf', 'auenbach',
-            'michael', 'michaelerberg', 'michaelsberg', 'michaelbeuern',
+            'michael', 'michaelerberg', 'michaelsberg', 'michaelbeuern', 'steuerberg',
         );
         
         $original_text = $text;
@@ -587,8 +580,8 @@ class FahrplanPortal_Utils {
     }
     
     /**
-     * ✅ ERWEITERTE process_abbreviations mit neuen österreichischen Ortsnamen-Regeln
-     * NEU: Bad Kleinkirchheim, St.Peter am Wallersberg, Eis bei Ruden, St.Veit im Jauntal
+     * ✅ KOMPLETT UMSTRUKTURIERT: process_abbreviations mit absoluter Priorität für "ob/bei" Muster
+     * ✅ KRITISCHER FIX: "[Ort] ob [Ort]" und "[Ort] bei [Ort]" haben ABSOLUTE PRIORITÄT
      */
     public function process_abbreviations($orte_array) {
         $processed_orte = array();
@@ -599,275 +592,260 @@ class FahrplanPortal_Utils {
         while ($i < count($orte_array)) {
             $current = strtolower(trim($orte_array[$i]));
             
-            // ✅ NEU: "klein" + "st" + Name = "Klein St.Name"
-            if ($current === 'klein' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'st' &&
+            // =================================================================
+            // ABSOLUTE PRIORITÄT: "ob" und "bei" Muster MÜSSEN ZUERST KOMMEN!
+            // =================================================================
+            
+            // ✅ HÖCHSTE PRIORITÄT: "[Ort] ob [Ort]" (z.B. lind, ob, velden)
+            if (isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'ob' &&
                 isset($orte_array[$i + 2])) {
                 
-                $name = $this->ucfirst_german($orte_array[$i + 2]);
-                $processed_orte[] = 'Klein St.' . $name;
+                $ort1 = $this->ucfirst_german($current);
+                $ort2 = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = $ort1 . ' ob ' . $ort2;
                 $i += 3;
-                error_log("FAHRPLANPORTAL: Klein St.$name erkannt");
-                continue;
-            }
-
-            // ✅ Ähnlich für "groß" + "st" + Name
-            if ($current === 'groß' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'st' &&
-                isset($orte_array[$i + 2])) {
-                
-                $name = $this->ucfirst_german($orte_array[$i + 2]);
-                $processed_orte[] = 'Groß St.' . $name;
-                $i += 3;
-                error_log("FAHRPLANPORTAL: Groß St.$name erkannt");
-                continue;
-            }
-
-            // ✅ Für "alt" + "st" + Name
-            if ($current === 'alt' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'st' &&
-                isset($orte_array[$i + 2])) {
-                
-                $name = $this->ucfirst_german($orte_array[$i + 2]);
-                $processed_orte[] = 'Alt St.' . $name;
-                $i += 3;
-                error_log("FAHRPLANPORTAL: Alt St.$name erkannt");
-                continue;
-            }
-
-            // ✅ Für "neu" + "st" + Name
-            if ($current === 'neu' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'st' &&
-                isset($orte_array[$i + 2])) {
-                
-                $name = $this->ucfirst_german($orte_array[$i + 2]);
-                $processed_orte[] = 'Neu St.' . $name;
-                $i += 3;
-                error_log("FAHRPLANPORTAL: Neu St.$name erkannt");
+                error_log("FAHRPLANPORTAL: ABSOLUTE PRIORITÄT - $ort1 ob $ort2 als Einheit erkannt");
                 continue;
             }
             
-            // ✅ NEU: SPEZIALFALL "st" + "georgen" + "am" + Ort (4 Teile)
-            if ($current === 'st' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'georgen' &&
-                isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'am' &&
+            // ✅ HÖCHSTE PRIORITÄT: "[Ort] bei [Ort]" (z.B. edling, bei, mittlern)
+            if (isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'bei' &&
+                isset($orte_array[$i + 2])) {
+                
+                $ort1 = $this->ucfirst_german($current);
+                $ort2 = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = $ort1 . ' bei ' . $ort2;
+                $i += 3;
+                error_log("FAHRPLANPORTAL: ABSOLUTE PRIORITÄT - $ort1 bei $ort2 als Einheit erkannt");
+                continue;
+            }
+            
+            // =================================================================
+            // ZWEITE PRIORITÄT: 5-TEILIGE ST.-MUSTER
+            // =================================================================
+            
+            // ✅ St.[Stadt] an der [Fluss] (z.B. st, veit, an, der, glan)
+            if ($current === 'st' && isset($orte_array[$i + 1]) &&
+                isset($orte_array[$i + 2]) && strtolower(trim($orte_array[$i + 2])) === 'an' &&
+                isset($orte_array[$i + 3]) && strtolower(trim($orte_array[$i + 3])) === 'der' &&
+                isset($orte_array[$i + 4])) {
+                
+                $stadtname = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $fluss = $this->ucfirst_german(trim($orte_array[$i + 4]));
+                $processed_orte[] = 'St.' . $stadtname . ' an der ' . $fluss;
+                $i += 5;
+                error_log("FAHRPLANPORTAL: St.$stadtname an der $fluss als 5-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // ✅ St.[Stadt] ob der [Ort] (z.B. st, michael, ob, der, gurk)
+            if ($current === 'st' && isset($orte_array[$i + 1]) &&
+                isset($orte_array[$i + 2]) && strtolower(trim($orte_array[$i + 2])) === 'ob' &&
+                isset($orte_array[$i + 3]) && strtolower(trim($orte_array[$i + 3])) === 'der' &&
+                isset($orte_array[$i + 4])) {
+                
+                $stadtname = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $ort = $this->ucfirst_german(trim($orte_array[$i + 4]));
+                $processed_orte[] = 'St.' . $stadtname . ' ob der ' . $ort;
+                $i += 5;
+                error_log("FAHRPLANPORTAL: St.$stadtname ob der $ort als 5-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // =================================================================
+            // DRITTE PRIORITÄT: 4-TEILIGE ST.-MUSTER
+            // =================================================================
+            
+            // ✅ St.[Name] im [Tal] (z.B. st, andrä, im, lavanttal)
+            if ($current === 'st' && isset($orte_array[$i + 1]) &&
+                isset($orte_array[$i + 2]) && strtolower(trim($orte_array[$i + 2])) === 'im' &&
                 isset($orte_array[$i + 3])) {
                 
-                $ort = $this->ucfirst_german_with_umlauts($orte_array[$i + 3]);
-                $processed_orte[] = 'St.Georgen am ' . $ort;
+                $name = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $tal = $this->ucfirst_german(trim($orte_array[$i + 3]));
+                $processed_orte[] = 'St.' . $name . ' im ' . $tal;
                 $i += 4;
-                error_log("FAHRPLANPORTAL: St.Georgen am $ort erkannt");
+                error_log("FAHRPLANPORTAL: St.$name im $tal als 4-teilige Einheit erkannt");
                 continue;
             }
             
-            // ✅ NEU: SPEZIALFALL "st" + "veit" + "an" + "der" + "glan" (5 Teile)
-            if ($current === 'st' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'veit' &&
-                isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'an' &&
-                isset($orte_array[$i + 3]) && strtolower($orte_array[$i + 3]) === 'der' &&
-                isset($orte_array[$i + 4]) && strtolower($orte_array[$i + 4]) === 'glan') {
+            // ✅ St.[Name] am [Ort] (z.B. st, margarethen, am, töllerberg)
+            if ($current === 'st' && isset($orte_array[$i + 1]) &&
+                isset($orte_array[$i + 2]) && strtolower(trim($orte_array[$i + 2])) === 'am' &&
+                isset($orte_array[$i + 3])) {
                 
-                $processed_orte[] = 'St.Veit an der Glan';
-                $i += 5;
-                error_log("FAHRPLANPORTAL: St.Veit an der Glan erkannt");
-                continue;
-            }
-
-            // ✅ NEU: SPEZIALFALL "spittal" + "an" + "der" + "drau" (4 Teile)
-            if ($current === 'spittal' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'an' &&
-                isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'der' &&
-                isset($orte_array[$i + 3]) && strtolower($orte_array[$i + 3]) === 'drau') {
-                
-                $processed_orte[] = 'Spittal an der Drau';
+                $name = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $ort = $this->ucfirst_german(trim($orte_array[$i + 3]));
+                $processed_orte[] = 'St.' . $name . ' am ' . $ort;
                 $i += 4;
-                error_log("FAHRPLANPORTAL: Spittal an der Drau erkannt");
-                continue;
-            }
-
-            // ✅ NEU: Prüfe auf "feistritz" + "an" + "der" + "drau" (4 Teile)
-            if ($current === 'feistritz' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'an' &&
-                isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'der' &&
-                isset($orte_array[$i + 3]) && strtolower($orte_array[$i + 3]) === 'drau') {
-                
-                $processed_orte[] = 'Feistritz an der Drau';
-                $i += 4;
-                error_log("FAHRPLANPORTAL: Feistritz an der Drau als Einheit erkannt");
+                error_log("FAHRPLANPORTAL: St.$name am $ort als 4-teilige Einheit erkannt");
                 continue;
             }
             
-            // ✅ KORRIGIERT: Generische "an der" Erkennung mit besserem ucfirst (3 Teile)
-            if ($current === 'an' && 
-                isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'der' &&
+            // ✅ St.[Name] ob [Ort] (z.B. st, michael, ob, bleiburg)
+            if ($current === 'st' && isset($orte_array[$i + 1]) &&
+                isset($orte_array[$i + 2]) && strtolower(trim($orte_array[$i + 2])) === 'ob' &&
+                isset($orte_array[$i + 3])) {
+                
+                $name = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $ort = $this->ucfirst_german(trim($orte_array[$i + 3]));
+                $processed_orte[] = 'St.' . $name . ' ob ' . $ort;
+                $i += 4;
+                error_log("FAHRPLANPORTAL: St.$name ob $ort als 4-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // =================================================================
+            // VIERTE PRIORITÄT: 4-TEILIGE GENERISCHE MUSTER
+            // =================================================================
+            
+            // ✅ GENERISCHE REGEL für ALLE Städte mit "an der [fluss]"
+            if (isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'an' &&
+                isset($orte_array[$i + 2]) && strtolower(trim($orte_array[$i + 2])) === 'der' &&
+                isset($orte_array[$i + 3])) {
+                
+                $stadtname = $this->ucfirst_german($current);
+                $fluss = $this->ucfirst_german(trim($orte_array[$i + 3]));
+                $processed_orte[] = $stadtname . ' an der ' . $fluss;
+                $i += 4;
+                error_log("FAHRPLANPORTAL: $stadtname an der $fluss als 4-teilige Einheit erkannt (generisch)");
+                continue;
+            }
+            
+            // =================================================================
+            // FÜNFTE PRIORITÄT: 3-TEILIGE MUSTER
+            // =================================================================
+            
+            // ✅ "klein" + "st" + Name = "Klein St.Name"
+            if ($current === 'klein' && 
+                isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'st' &&
                 isset($orte_array[$i + 2])) {
                 
-                $place = $this->ucfirst_german_with_umlauts($orte_array[$i + 2]);
-                $processed_orte[] = 'an der ' . $place;
+                $name = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = 'Klein St.' . $name;
                 $i += 3;
-                error_log("FAHRPLANPORTAL: an der $place erkannt");
+                error_log("FAHRPLANPORTAL: Klein St.$name als 3-teilige Einheit erkannt");
+                continue;
+            }
+
+            // ✅ "groß" + "st" + Name
+            if ($current === 'groß' && 
+                isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'st' &&
+                isset($orte_array[$i + 2])) {
+                
+                $name = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = 'Groß St.' . $name;
+                $i += 3;
+                error_log("FAHRPLANPORTAL: Groß St.$name als 3-teilige Einheit erkannt");
+                continue;
+            }
+
+            // ✅ "alt" + "st" + Name
+            if ($current === 'alt' && 
+                isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'st' &&
+                isset($orte_array[$i + 2])) {
+                
+                $name = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = 'Alt St.' . $name;
+                $i += 3;
+                error_log("FAHRPLANPORTAL: Alt St.$name als 3-teilige Einheit erkannt");
+                continue;
+            }
+
+            // ✅ "neu" + "st" + Name
+            if ($current === 'neu' && 
+                isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'st' &&
+                isset($orte_array[$i + 2])) {
+                
+                $name = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = 'Neu St.' . $name;
+                $i += 3;
+                error_log("FAHRPLANPORTAL: Neu St.$name als 3-teilige Einheit erkannt");
                 continue;
             }
             
-            // ✅ NEU: "bad" + Ortsname (z.B. Bad Kleinkirchheim, Bad Eisenkappel)
-            if ($current === 'bad' && isset($orte_array[$i + 1])) {
-                $next_ort = $this->ucfirst_german_with_umlauts($orte_array[$i + 1]);
-                $processed_orte[] = 'Bad ' . $next_ort;
-                $i += 2;
-                error_log("FAHRPLANPORTAL: Bad $next_ort erkannt");
-                continue;
-            }
-            
-            // ✅ KORRIGIERT: "am" + Ortsname mit besserer Umlaut-Behandlung
-            if ($current === 'am' && isset($orte_array[$i + 1])) {
-                $next_ort = $this->ucfirst_german_with_umlauts($orte_array[$i + 1]);
-                $processed_orte[] = 'am ' . $next_ort;
-                $i += 2;
-                error_log("FAHRPLANPORTAL: am $next_ort erkannt");
-                continue;
-            }
-            
-            // ✅ NEU: "bei" + Ortsname (z.B. Eis bei Ruden)
-            if ($current === 'bei' && isset($orte_array[$i + 1])) {
-                $next_ort = $this->ucfirst_german_with_umlauts($orte_array[$i + 1]);
-                $processed_orte[] = 'bei ' . $next_ort;
-                $i += 2;
-                error_log("FAHRPLANPORTAL: bei $next_ort erkannt");
-                continue;
-            }
-            
-            // ✅ ERWEITERTE "st" Regeln
-            if ($current === 'st' && isset($orte_array[$i + 1])) {
-                // ✅ NEU: St.Veit im Jauntal (4 Teile: st + veit + im + jauntal)
-                if (isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'veit' &&
-                    isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'im' &&
-                    isset($orte_array[$i + 3]) && strtolower($orte_array[$i + 3]) === 'jauntal') {
-                    
-                    $processed_orte[] = 'St.Veit im Jauntal';
-                    $i += 4;
-                    error_log("FAHRPLANPORTAL: St.Veit im Jauntal erkannt");
-                    continue;
-                }
+            // ✅ "ob der" Regel (nur wenn nicht von St.-Regeln erfasst)
+            if ($current === 'ob' && 
+                isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'der' &&
+                isset($orte_array[$i + 2])) {
                 
-                // ✅ NEU: St.Peter am Wallersberg (4 Teile: st + peter + am + wallersberg)  
-                if (isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'peter' &&
-                    isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'am' &&
-                    isset($orte_array[$i + 3]) && strtolower($orte_array[$i + 3]) === 'wallersberg') {
-                    
-                    $processed_orte[] = 'St.Peter am Wallersberg';
-                    $i += 4;
-                    error_log("FAHRPLANPORTAL: St.Peter am Wallersberg erkannt");
-                    continue;
-                }
-                
-                // ✅ BESTEHEND: St.Michael ob der Gurk (5 Teile)
-                if (isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'michael' &&
-                    isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'ob' &&
-                    isset($orte_array[$i + 3]) && strtolower($orte_array[$i + 3]) === 'der' &&
-                    isset($orte_array[$i + 4]) && strtolower($orte_array[$i + 4]) === 'gurk') {
-                    
-                    $processed_orte[] = 'St.Michael ob der Gurk';
-                    $i += 5;
-                    error_log("FAHRPLANPORTAL: St.Michael ob der Gurk erkannt");
-                    continue;
-                }
-                
-                // ✅ NORMALE St.-Verarbeitung (für alle anderen St.-Namen)
-                $next_ort = trim($orte_array[$i + 1]);
-                $combined = 'St.' . $this->ucfirst_german_with_umlauts($next_ort);
-                $processed_orte[] = $combined;
-                $i += 2;
-                error_log("FAHRPLANPORTAL: St-Abkürzung: 'st + $next_ort' → '$combined'");
-            }
-            // ✅ REGEL für "ob der"
-            elseif ($current === 'ob' && 
-                    isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'der' &&
-                    isset($orte_array[$i + 2])) {
-                
-                $place = $this->ucfirst_german_with_umlauts($orte_array[$i + 2]);
+                $place = $this->ucfirst_german(trim($orte_array[$i + 2]));
                 $processed_orte[] = 'ob der ' . $place;
                 $i += 3;
-                error_log("FAHRPLANPORTAL: ob der $place erkannt");
+                error_log("FAHRPLANPORTAL: ob der $place als 3-teilige Einheit erkannt");
+                continue;
             }
-            // ✅ REGEL für "im"
-            elseif ($current === 'im' && isset($orte_array[$i + 1])) {
-                $next_ort = $this->ucfirst_german_with_umlauts($orte_array[$i + 1]);
+            
+            // =================================================================
+            // SECHSTE PRIORITÄT: 2-TEILIGE MUSTER
+            // =================================================================
+            
+            // ✅ Maria + beliebiger Ortsname
+            if ($current === 'maria' && isset($orte_array[$i + 1])) {
+                $next_ort = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $processed_orte[] = 'Maria ' . $next_ort;
+                $i += 2;
+                error_log("FAHRPLANPORTAL: Maria $next_ort als 2-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // ✅ Bad + Ortsname
+            if ($current === 'bad' && isset($orte_array[$i + 1])) {
+                $next_ort = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $processed_orte[] = 'Bad ' . $next_ort;
+                $i += 2;
+                error_log("FAHRPLANPORTAL: Bad $next_ort als 2-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // ✅ Firma + Firmenname
+            if ($current === 'firma' && isset($orte_array[$i + 1])) {
+                $firmenname = $this->ucfirst_german(trim($orte_array[$i + 1]));
+                $processed_orte[] = 'Firma ' . $firmenname;
+                $i += 2;
+                error_log("FAHRPLANPORTAL: Firma $firmenname als 2-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // ✅ Standard "st" Verarbeitung (für einfache St.-Namen)
+            if ($current === 'st' && isset($orte_array[$i + 1])) {
+                $next_ort = trim($orte_array[$i + 1]);
+                $combined = 'St.' . $this->ucfirst_german($next_ort);
+                $processed_orte[] = $combined;
+                $i += 2;
+                error_log("FAHRPLANPORTAL: St.$next_ort als 2-teilige Einheit erkannt");
+                continue;
+            }
+            
+            // ✅ "im" Regel
+            if ($current === 'im' && isset($orte_array[$i + 1])) {
+                $next_ort = $this->ucfirst_german(trim($orte_array[$i + 1]));
                 $processed_orte[] = 'im ' . $next_ort;
                 $i += 2;
-                error_log("FAHRPLANPORTAL: im $next_ort erkannt");
+                error_log("FAHRPLANPORTAL: im $next_ort als 2-teilige Einheit erkannt");
+                continue;
             }
-            // ✅ Spezialwörter
-            elseif ($current === 'firma' || $current === 'bahnhof' || $current === 'maria') {
-                if ($current === 'maria' && isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'saal') {
-                    $processed_orte[] = 'Maria Saal';
-                    $i += 2;
-                    error_log("FAHRPLANPORTAL: Maria Saal erkannt");
-                } else {
-                    $processed_orte[] = $this->ucfirst_german_with_umlauts($current);
-                    $i++;
-                }
-            }
-            // ✅ NEU: SPEZIALFALL für "eis" + "bei" + "ruden" (3 Teile)  
-            elseif ($current === 'eis' && 
-                    isset($orte_array[$i + 1]) && strtolower($orte_array[$i + 1]) === 'bei' &&
-                    isset($orte_array[$i + 2]) && strtolower($orte_array[$i + 2]) === 'ruden') {
-                
-                $processed_orte[] = 'Eis bei Ruden';
-                $i += 3;
-                error_log("FAHRPLANPORTAL: Eis bei Ruden erkannt");
-            }
-            // Standard-Fall
-            else {
-                $processed_orte[] = $this->ucfirst_german_with_umlauts(trim($orte_array[$i]));
+            
+            // ✅ "bahnhof" Regel
+            if ($current === 'bahnhof') {
+                $processed_orte[] = 'Bahnhof';
                 $i++;
+                error_log("FAHRPLANPORTAL: Bahnhof als Einzelwort erkannt");
+                continue;
             }
+            
+            // =================================================================
+            // LETZTE PRIORITÄT: STANDARD-FALL
+            // =================================================================
+            
+            // Standard-Fall: Einzelner Ortsteil
+            $processed_orte[] = $this->ucfirst_german(trim($orte_array[$i]));
+            $i++;
         }
         
         error_log("FAHRPLANPORTAL: Abkürzungs-Verarbeitung Ende: " . implode(', ', $processed_orte));
         
         return $processed_orte;
-    }
-
-
-
-    /**
-     * ✅ NEU: Verbesserte ucfirst-Funktion speziell für deutsche Umlaute
-     * Behandelt ö, ü, ä korrekt: "töllerberg" → "Töllerberg", "längsee" → "Längsee"
-     */
-    public function ucfirst_german_with_umlauts($word) {
-        $word = trim($word);
-        
-        if (empty($word)) {
-            return $word;
-        }
-        
-        // ✅ SPEZIELLE BEHANDLUNG für deutsche Umlaute am Wortanfang
-        $umlaut_mappings = array(
-            'ö' => 'Ö', 'ü' => 'Ü', 'ä' => 'Ä', 
-            'ß' => 'ß'  // ß bleibt klein, da es kein Großbuchstaben-ß gibt
-        );
-        
-        $first_char = mb_substr($word, 0, 1, 'UTF-8');
-        
-        if (isset($umlaut_mappings[$first_char])) {
-            // Umlaut am Anfang → speziell behandeln
-            $capitalized_first = $umlaut_mappings[$first_char];
-            $rest = mb_substr($word, 1, null, 'UTF-8');
-            $result = $capitalized_first . $rest;
-            
-            error_log("FAHRPLANPORTAL: Umlaut-Kapitalisierung: '$word' → '$result'");
-            return $result;
-        }
-        
-        // ✅ STANDARD-BEHANDLUNG für normale Buchstaben
-        $result = mb_strtoupper(mb_substr($word, 0, 1, 'UTF-8'), 'UTF-8') . 
-                  mb_substr($word, 1, null, 'UTF-8');
-        
-        if ($result !== $word) {
-            error_log("FAHRPLANPORTAL: Standard-Kapitalisierung: '$word' → '$result'");
-        }
-        
-        return $result;
     }
     
     /**

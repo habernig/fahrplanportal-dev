@@ -410,7 +410,7 @@ class FahrplanPortal_Parser {
                     strpos($ort_mit_umlauten, ' im ') !== false) {
                     $ort_formatted = $ort_mit_umlauten;
                 } else {
-                    $ort_formatted = $this->utils->ucfirst_german($ort_mit_umlauten);
+                    $ort_formatted = ucfirst($ort_mit_umlauten);
                 }
                 
                 $orte_formatted[] = $ort_formatted;
