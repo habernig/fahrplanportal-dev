@@ -582,6 +582,7 @@ class FahrplanPortal_Utils {
     /**
      * ✅ KOMPLETT UMSTRUKTURIERT: process_abbreviations mit absoluter Priorität für "ob/bei" Muster
      * ✅ KRITISCHER FIX: "[Ort] ob [Ort]" und "[Ort] bei [Ort]" haben ABSOLUTE PRIORITÄT
+     * ✅ NEU: "bad" + "st" + Name → "Bad St.[Name]" (Priorität 5)
      */
     public function process_abbreviations($orte_array) {
         $processed_orte = array();
@@ -716,6 +717,18 @@ class FahrplanPortal_Utils {
             // FÜNFTE PRIORITÄT: 3-TEILIGE MUSTER
             // =================================================================
             
+            // ✅ NEU: "bad" + "st" + Name = "Bad St.Name" (z.B. bad, st, leonhard)
+            if ($current === 'bad' && 
+                isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'st' &&
+                isset($orte_array[$i + 2])) {
+                
+                $name = $this->ucfirst_german(trim($orte_array[$i + 2]));
+                $processed_orte[] = 'Bad St.' . $name;
+                $i += 3;
+                error_log("FAHRPLANPORTAL: Bad St.$name als 3-teilige Einheit erkannt (NEU)");
+                continue;
+            }
+            
             // ✅ "klein" + "st" + Name = "Klein St.Name"
             if ($current === 'klein' && 
                 isset($orte_array[$i + 1]) && strtolower(trim($orte_array[$i + 1])) === 'st' &&
@@ -789,7 +802,7 @@ class FahrplanPortal_Utils {
                 continue;
             }
             
-            // ✅ Bad + Ortsname
+            // ✅ Bad + Ortsname (WICHTIG: Diese Regel kommt NACH der 3-teiligen "bad-st-name" Regel!)
             if ($current === 'bad' && isset($orte_array[$i + 1])) {
                 $next_ort = $this->ucfirst_german(trim($orte_array[$i + 1]));
                 $processed_orte[] = 'Bad ' . $next_ort;
