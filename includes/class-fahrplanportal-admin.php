@@ -63,7 +63,7 @@ class FahrplanPortal_Admin {
             'fahrplaene',
             'DB Wartung',
             'DB Wartung',
-            'manage_options',
+            'edit_posts',
             'fahrplanportal-db',
             array($this, 'db_maintenance_page')
         );
@@ -202,7 +202,7 @@ class FahrplanPortal_Admin {
                         </div>
                         <div class="col-sm-3" style="padding: 0 10px;">
                             <span class="badge badge-info" style="background: #00a0d2; color: white; padding: 5px 10px;">
-                                ⟳ Übersprungen: <span id="scan-skipped">0</span>
+                                ⏳ Übersprungen: <span id="scan-skipped">0</span>
                             </span>
                         </div>
                         <div class="col-sm-3" style="padding: 0 10px;">
@@ -405,7 +405,7 @@ class FahrplanPortal_Admin {
     }
 
     /**
-     * DB-Wartungsseite - ✅ GEFIXT: Admin-Only Interface mit neuer Mapping-Erklärung
+     * ✅ DB-Wartungsseite - ANGEPASST: Konditionelle UI für Admin/Redakteur
      */
     public function db_maintenance_page() {
         $current_exclusions = get_option('fahrplanportal_exclusion_words', '');
@@ -420,11 +420,74 @@ class FahrplanPortal_Admin {
                 return !empty($line) && strpos($line, '//') !== 0 && strpos($line, '#') !== 0;
             }));
         }
+        
+        // ✅ Berechtigungsprüfung für verschiedene Bereiche
+        $is_admin = current_user_can('manage_options');
+        $can_edit = current_user_can('edit_posts');
         ?>
         <div class="wrap">
             <h1>Datenbank Wartung</h1>
             
-            <?php if ($this->pdf_parsing_enabled): ?>
+            <!-- ✅ LINIEN-MAPPING SEKTION - FÜR ALLE BENUTZER MIT edit_posts -->
+            <?php if ($can_edit): ?>
+            <div class="line-mapping-management">
+                <h3>🔄 Linien-Mapping (Neu → Alt) - NEUE NUMMERNLOGIK</h3>
+                
+                <p class="description">
+                    Das System erkennt 2-3 stellige Fahrplannummern (561, 82) als neue Hauptnummern und ordnet diese über eine Mapping-Tabelle den alten 4-stelligen Nummern zu.
+                    <br><strong>Format:</strong> Eine Zuordnung pro Zeile im Format <code>neue_nummer:alte_nummer</code>
+                    <br><strong>Aktuell:</strong> <?php echo $mapping_count; ?> Zuordnungen in der Mapping-Liste.
+                </p>
+                
+                <div class="mapping-form">
+                    <textarea id="line-mapping" name="line_mapping" rows="12" cols="100" 
+                              placeholder="// ✅ NEUES Linien-Mapping Format: neue_nummer:alte_nummer
+// Beispiele:
+100:5000
+101:5001
+102:5002
+561:5561
+82:5082
+
+// ⚠️ NICHT MEHR: 5000:100 (alte Format)
+// ✅ JETZT: 100:5000 (neue Format)
+
+// Kommentare mit // oder # sind erlaubt
+# Mapping für Kärntner Linien"
+                              style="width: 100%; font-family: monospace; font-size: 12px;"><?php echo esc_textarea($current_mapping); ?></textarea>
+                    
+                    <p>
+                        <button type="button" id="save-line-mapping" class="button button-primary">
+                            <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
+                            Linien-Mapping speichern
+                        </button>
+                        
+                        <!-- ✅ NEU: Mapping DB-Abgleich Button -->
+                        <button type="button" id="update-mapping-in-db" class="button button-secondary" 
+                                style="margin-left: 10px;">
+                            <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
+                            Mapping Tabelle mit DB aktualisieren
+                        </button>
+                        
+                        <span id="mapping-status" style="margin-left: 15px;"></span>
+                    </p>
+                    
+                    <!-- ✅ NEU: Erklärung für den neuen Button -->
+                    <div style="background: #e8f4fd; border: 1px solid #0073aa; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                        <p style="margin: 0; font-size: 13px; color: #0073aa;">
+                            <span class="dashicons dashicons-info" style="vertical-align: middle; margin-right: 5px;"></span>
+                            <strong>Mapping DB-Abgleich:</strong> Aktualisiert alle bestehenden Fahrpläne in der Datenbank 
+                            mit den neuen Mapping-Zuordnungen, ohne die PDFs nochmals einzulesen.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <!-- ✅ ADMIN-ONLY SEKTION: Exklusionsliste und Tag-Analyse -->
+            <?php if ($is_admin && $this->pdf_parsing_enabled): ?>
+            <hr style="margin: 30px 0;">
+            
             <!-- SEKTION: Exklusionsliste -->
             <div class="exclusion-management">
                 <h3>PDF-Parsing Exklusionsliste</h3>
@@ -448,19 +511,11 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                             <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
                             Exklusionsliste speichern
                         </button>
-                        <?php /* ?>
-                        <button type="button" id="load-exclusion-words" class="button button-secondary">
-                            <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
-                            Neu laden
-                        </button>
-                        <?php */ ?>
                         <span id="exclusion-status" style="margin-left: 15px;"></span>
                     </p>
-                    
                 </div>
             </div>
 
-            <?php if ($this->pdf_parsing_enabled): ?>
             <hr style="margin: 30px 0;">
 
             <!-- ✅ NEU: TAG-BEREINIGUNG SEKTION -->
@@ -530,95 +585,7 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                     </details>
                 </div>
             </div>
-            <?php endif; ?>
             
-            <hr style="margin: 30px 0;">
-            <?php endif; ?>
-            
-            <!-- ✅ GEÄNDERT: SEKTION: Linien-Mapping mit neuer Erklärung -->
-            <div class="line-mapping-management">
-                <h3>🔄 Linien-Mapping (Neu → Alt) - NEUE NUMMERNLOGIK</h3>
-                
-                <p class="description">
-                    Das System erkennt 2-3 stellige Fahrplannummern (561, 82) als neue Hauptnummern und ordnet diese über eine Mapping-Tabelle den alten 4-stelligen Nummern zu.
-                    <br><strong>Format:</strong> Eine Zuordnung pro Zeile im Format <code>neue_nummer:alte_nummer</code>
-                    <br><strong>Aktuell:</strong> <?php echo $mapping_count; ?> Zuordnungen in der Mapping-Liste.
-                </p>
-                
-                <div class="mapping-form">
-                    <textarea id="line-mapping" name="line_mapping" rows="12" cols="100" 
-                              placeholder="// ✅ NEUES Linien-Mapping Format: neue_nummer:alte_nummer
-// Beispiele:
-100:5000
-101:5001
-102:5002
-561:5561
-82:5082
-
-// ⚠️ NICHT MEHR: 5000:100 (alte Format)
-// ✅ JETZT: 100:5000 (neue Format)
-
-// Kommentare mit // oder # sind erlaubt
-# Mapping für Kärntner Linien"
-                              style="width: 100%; font-family: monospace; font-size: 12px;"><?php echo esc_textarea($current_mapping); ?></textarea>
-                    
-                    <p>
-                        <button type="button" id="save-line-mapping" class="button button-primary">
-                            <span class="dashicons dashicons-saved" style="vertical-align: middle;"></span> 
-                            Linien-Mapping speichern
-                        </button>
-                        
-                        <!-- ✅ NEU: Mapping DB-Abgleich Button -->
-                        <button type="button" id="update-mapping-in-db" class="button button-secondary" 
-                                style="margin-left: 10px;">
-                            <span class="dashicons dashicons-update" style="vertical-align: middle;"></span> 
-                            Mapping Tabelle mit dB aktualisieren
-                        </button>
-                        
-                        <span id="mapping-status" style="margin-left: 15px;"></span>
-                    </p>
-                    
-                    <!-- ✅ NEU: Erklärung für den neuen Button -->
-                    <div style="background: #e8f4fd; border: 1px solid #0073aa; border-radius: 4px; padding: 10px; margin: 10px 0;">
-                        <p style="margin: 0; font-size: 13px; color: #0073aa;">
-                            <span class="dashicons dashicons-info" style="vertical-align: middle; margin-right: 5px;"></span>
-                            <strong>Mapping DB-Abgleich:</strong> Aktualisiert alle bestehenden Fahrpläne in der Datenbank 
-                            mit den neuen Mapping-Zuordnungen, ohne die PDFs nochmals einzulesen.
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            
-            
-            <hr style="margin: 30px 0;">
-            
-            <div class="db-maintenance">
-                <h3>Gefährliche Aktionen</h3>
-                <p>
-                    <button type="button" id="recreate-db" class="button button-secondary">
-                        Datenbank neu erstellen
-                    </button>
-                    <span class="description">Löscht alle Daten und erstellt die Tabelle neu!</span>
-                </p>
-                
-                <p>
-                    <button type="button" id="clear-db" class="button button-secondary">
-                        Alle Einträge löschen
-                    </button>
-                    <span class="description">Behält die Tabelle, löscht nur die Daten.</span>
-                </p>
-                
-                <h3>Statistiken</h3>
-                <p>Anzahl Fahrpläne: <strong><?php echo $this->database->get_fahrplaene_count(); ?></strong></p>
-                <p>PDF-Parsing: <strong><?php echo $this->pdf_parsing_enabled ? 'Aktiviert' : 'Nicht verfügbar'; ?></strong></p>
-                <?php if ($this->pdf_parsing_enabled): ?>
-                <p>Exklusionsliste: <strong><?php echo $word_count; ?> Wörter</strong></p>
-                <?php endif; ?>
-                <p>Linien-Mapping: <strong><?php echo $mapping_count; ?> Zuordnungen (Neu → Alt Format)</strong></p>
-            </div>
-
-            <?php if ($this->pdf_parsing_enabled): ?>
             <hr style="margin: 30px 0;">
 
             <!-- ✅ NEU: TAG-ANALYSE SEKTION -->
@@ -668,164 +635,212 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
                 </div>
                 
                 <!-- ✅ NEU: ERGEBNISSE CONTAINER (KOMPLETT) -->
-                    <div id="tag-analysis-results" style="display: none; margin-top: 30px;">
+                <div id="tag-analysis-results" style="display: none; margin-top: 30px;">
+                    
+                    <!-- Statistiken -->
+                    <div id="tag-analysis-statistics" style="
+                        background: #fff3cd;
+                        border: 2px solid #ffc107;
+                        border-radius: 8px;
+                        padding: 20px;
+                        margin-bottom: 25px;
+                    ">
+                        <h4 style="margin: 0 0 15px 0; color: #856404;">📊 Analyse-Statistiken</h4>
+                        <div id="tag-stats-content" style="
+                            display: grid;
+                            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                            gap: 15px;
+                            color: #856404;
+                            font-weight: 500;
+                        ">
+                            <!-- Wird von JavaScript gefüllt -->
+                        </div>
+                    </div>
+                    
+                    <!-- ✅ TAG-LISTEN: FEHLENDE CONTAINER HINZUGEFÜGT -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
                         
-                        <!-- Statistiken -->
-                        <div id="tag-analysis-statistics" style="
-                            background: #fff3cd;
-                            border: 2px solid #ffc107;
+                        <!-- Grüne Tags (Bereits ausgeschlossen) -->
+                        <div style="
+                            background: #d4edda;
+                            border: 2px solid #28a745;
                             border-radius: 8px;
                             padding: 20px;
-                            margin-bottom: 25px;
                         ">
-                            <h4 style="margin: 0 0 15px 0; color: #856404;">📊 Analyse-Statistiken</h4>
-                            <div id="tag-stats-content" style="
-                                display: grid;
-                                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                                gap: 15px;
-                                color: #856404;
-                                font-weight: 500;
+                            <h4 style="margin: 0 0 15px 0; color: #155724;">
+                                🟢 Bereits ausgeschlossene Tags (<span id="excluded-tags-count">0</span>)
+                            </h4>
+                            <div id="excluded-tags-list" style="
+                                max-height: 300px;
+                                overflow-y: auto;
+                                padding: 10px;
+                                background: rgba(255, 255, 255, 0.7);
+                                border-radius: 5px;
+                                color: #155724;
+                                font-size: 13px;
+                                line-height: 1.8;
                             ">
                                 <!-- Wird von JavaScript gefüllt -->
                             </div>
-                        </div>
-                        
-                        <!-- ✅ TAG-LISTEN: FEHLENDE CONTAINER HINZUGEFÜGT -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
-                            
-                            <!-- Grüne Tags (Bereits ausgeschlossen) -->
-                            <div style="
-                                background: #d4edda;
-                                border: 2px solid #28a745;
-                                border-radius: 8px;
-                                padding: 20px;
-                            ">
-                                <h4 style="margin: 0 0 15px 0; color: #155724;">
-                                    🟢 Bereits ausgeschlossene Tags (<span id="excluded-tags-count">0</span>)
-                                </h4>
-                                <div id="excluded-tags-list" style="
-                                    max-height: 300px;
-                                    overflow-y: auto;
-                                    padding: 10px;
-                                    background: rgba(255, 255, 255, 0.7);
-                                    border-radius: 5px;
-                                    color: #155724;
-                                    font-size: 13px;
-                                    line-height: 1.8;
-                                ">
-                                    <!-- Wird von JavaScript gefüllt -->
-                                </div>
-                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #c3e6cb;">
-                                    <p style="margin: 0; font-size: 12px; color: #155724;">
-                                        ✅ Diese Tags werden bereits durch die Exklusionsliste gefiltert
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <!-- Rote Tags (Noch nicht ausgeschlossen) -->
-                            <div style="
-                                background: #f8d7da;
-                                border: 2px solid #dc3545;
-                                border-radius: 8px;
-                                padding: 20px;
-                            ">
-                                <h4 style="margin: 0 0 15px 0; color: #721c24;">
-                                    🔴 Noch nicht ausgeschlossene Tags (<span id="not-excluded-tags-count">0</span>)
-                                </h4>
-                                <div id="not-excluded-tags-list" style="
-                                    max-height: 300px;
-                                    overflow-y: auto;
-                                    padding: 10px;
-                                    background: rgba(255, 255, 255, 0.7);
-                                    border-radius: 5px;
-                                    color: #721c24;
-                                    font-size: 13px;
-                                    line-height: 1.8;
-                                ">
-                                    <!-- Wird von JavaScript gefüllt -->
-                                </div>
-                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f5c6cb;">
-                                    <button type="button" id="copy-red-tags" class="button button-secondary" style="
-                                        background: #dc3545;
-                                        border-color: #dc3545;
-                                        color: white;
-                                        font-size: 12px;
-                                        padding: 5px 15px;
-                                    ">
-                                        📋 Rote Tags kopieren
-                                    </button>
-                                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #721c24;">
-                                        ⚠️ Diese Tags könnten zur Exklusionsliste hinzugefügt werden
-                                    </p>
-                                </div>
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #c3e6cb;">
+                                <p style="margin: 0; font-size: 12px; color: #155724;">
+                                    ✅ Diese Tags werden bereits durch die Exklusionsliste gefiltert
+                                </p>
                             </div>
                         </div>
                         
-                        <!-- Zusätzliche Analysen (Optional) -->
-                        <div style="margin-top: 25px;">
-                            <button type="button" id="show-analysis-extras" class="button button-secondary" style="
-                                background: #6c757d;
-                                border-color: #6c757d;
-                                color: white;
+                        <!-- Rote Tags (Noch nicht ausgeschlossen) -->
+                        <div style="
+                            background: #f8d7da;
+                            border: 2px solid #dc3545;
+                            border-radius: 8px;
+                            padding: 20px;
+                        ">
+                            <h4 style="margin: 0 0 15px 0; color: #721c24;">
+                                🔴 Noch nicht ausgeschlossene Tags (<span id="not-excluded-tags-count">0</span>)
+                            </h4>
+                            <div id="not-excluded-tags-list" style="
+                                max-height: 300px;
+                                overflow-y: auto;
+                                padding: 10px;
+                                background: rgba(255, 255, 255, 0.7);
+                                border-radius: 5px;
+                                color: #721c24;
+                                font-size: 13px;
+                                line-height: 1.8;
                             ">
-                                📊 Zusätzliche Analysen anzeigen
-                            </button>
-                            
-                            <div id="tag-analysis-extras" style="display: none; margin-top: 20px;">
-                                <div style="
-                                    background: #e9ecef;
-                                    border: 2px solid #6c757d;
-                                    border-radius: 8px;
-                                    padding: 20px;
+                                <!-- Wird von JavaScript gefüllt -->
+                            </div>
+                            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f5c6cb;">
+                                <button type="button" id="copy-red-tags" class="button button-secondary" style="
+                                    background: #dc3545;
+                                    border-color: #dc3545;
+                                    color: white;
+                                    font-size: 12px;
+                                    padding: 5px 15px;
                                 ">
-                                    <h4 style="margin: 0 0 15px 0; color: #495057;">📈 Erweiterte Analyse</h4>
+                                    📋 Rote Tags kopieren
+                                </button>
+                                <p style="margin: 5px 0 0 0; font-size: 12px; color: #721c24;">
+                                    ⚠️ Diese Tags könnten zur Exklusionsliste hinzugefügt werden
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Zusätzliche Analysen (Optional) -->
+                    <div style="margin-top: 25px;">
+                        <button type="button" id="show-analysis-extras" class="button button-secondary" style="
+                            background: #6c757d;
+                            border-color: #6c757d;
+                            color: white;
+                        ">
+                            📊 Zusätzliche Analysen anzeigen
+                        </button>
+                        
+                        <div id="tag-analysis-extras" style="display: none; margin-top: 20px;">
+                            <div style="
+                                background: #e9ecef;
+                                border: 2px solid #6c757d;
+                                border-radius: 8px;
+                                padding: 20px;
+                            ">
+                                <h4 style="margin: 0 0 15px 0; color: #495057;">📈 Erweiterte Analyse</h4>
+                                
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                                     
-                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                                        
-                                        <!-- Top Häufige Tags -->
-                                        <div>
-                                            <h5 style="color: #495057; margin: 0 0 10px 0;">🏆 Top 10 häufigste Tags:</h5>
-                                            <div id="frequent-tags-list" style="
-                                                background: white;
-                                                padding: 10px;
-                                                border-radius: 5px;
-                                                font-size: 12px;
-                                                line-height: 1.8;
-                                            ">
-                                                <!-- Wird von JavaScript gefüllt -->
-                                            </div>
+                                    <!-- Top Häufige Tags -->
+                                    <div>
+                                        <h5 style="color: #495057; margin: 0 0 10px 0;">🏆 Top 10 häufigste Tags:</h5>
+                                        <div id="frequent-tags-list" style="
+                                            background: white;
+                                            padding: 10px;
+                                            border-radius: 5px;
+                                            font-size: 12px;
+                                            line-height: 1.8;
+                                        ">
+                                            <!-- Wird von JavaScript gefüllt -->
                                         </div>
-                                        
-                                        <!-- Kurze Tags -->
-                                        <div>
-                                            <h5 style="color: #495057; margin: 0 0 10px 0;">📏 Sehr kurze Tags (≤2 Zeichen):</h5>
-                                            <div id="short-tags-list" style="
-                                                background: white;
-                                                padding: 10px;
-                                                border-radius: 5px;
-                                                font-size: 12px;
-                                            ">
-                                                <!-- Wird von JavaScript gefüllt -->
-                                            </div>
+                                    </div>
+                                    
+                                    <!-- Kurze Tags -->
+                                    <div>
+                                        <h5 style="color: #495057; margin: 0 0 10px 0;">🔍 Sehr kurze Tags (≤2 Zeichen):</h5>
+                                        <div id="short-tags-list" style="
+                                            background: white;
+                                            padding: 10px;
+                                            border-radius: 5px;
+                                            font-size: 12px;
+                                        ">
+                                            <!-- Wird von JavaScript gefüllt -->
                                         </div>
-                                        
-                                        <!-- Lange Tags -->
-                                        <div>
-                                            <h5 style="color: #495057; margin: 0 0 10px 0;">📐 Sehr lange Tags (≥15 Zeichen):</h5>
-                                            <div id="long-tags-list" style="
-                                                background: white;
-                                                padding: 10px;
-                                                border-radius: 5px;
-                                                font-size: 12px;
-                                            ">
-                                                <!-- Wird von JavaScript gefüllt -->
-                                            </div>
+                                    </div>
+                                    
+                                    <!-- Lange Tags -->
+                                    <div>
+                                        <h5 style="color: #495057; margin: 0 0 10px 0;">🔎 Sehr lange Tags (≥15 Zeichen):</h5>
+                                        <div id="long-tags-list" style="
+                                            background: white;
+                                            padding: 10px;
+                                            border-radius: 5px;
+                                            font-size: 12px;
+                                        ">
+                                            <!-- Wird von JavaScript gefüllt -->
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- ✅ ADMIN-ONLY SEKTION: Gefährliche DB-Operationen -->
+            <?php if ($is_admin): ?>
+            <hr style="margin: 30px 0;">
+            
+            <div class="db-operations" style="border-top: 2px solid #dc3545; padding-top: 20px; margin-top: 30px;">
+                <h3 style="color: #dc3545;">⚠️ Gefährliche Datenbank-Operationen</h3>
+                <p class="description" style="color: #d63031; font-weight: 500;">
+                    Diese Funktionen sind nur für Administratoren verfügbar und können Datenverlust verursachen!
+                </p>
+                
+                <p>
+                    <button type="button" id="recreate-db" class="button button-secondary" style="background: #d63031; color: white; border-color: #a02622;">
+                        🔄 Datenbank neu erstellen
+                    </button>
+                    <span class="description">Löscht alle Daten und erstellt die Tabelle neu!</span>
+                </p>
+                
+                <p>
+                    <button type="button" id="clear-db" class="button button-secondary" style="background: #d63031; color: white; border-color: #a02622;">
+                        🗑️ Alle Einträge löschen
+                    </button>
+                    <span class="description">Behält die Tabelle, löscht nur die Daten.</span>
+                </p>
+            </div>
+            <?php else: ?>
+            <!-- Info für Nicht-Admins -->
+            <hr style="margin: 30px 0;">
+            <div class="db-info" style="border-top: 1px solid #ccc; padding-top: 20px; margin-top: 30px;">
+                <p class="description" style="font-style: italic; color: #666;">
+                    💡 <strong>Hinweis:</strong> Erweiterte Datenbank-Wartungsfunktionen sind nur für Administratoren verfügbar.
+                </p>
+            </div>
+            <?php endif; ?>
+            
+            <!-- ✅ STATISTIKEN SEKTION - FÜR ALLE SICHTBAR -->
+            <?php if ($can_edit): ?>
+            <hr style="margin: 30px 0;">
+            <div class="statistics-section">
+                <h3>Statistiken</h3>
+                <p>Anzahl Fahrpläne: <strong><?php echo $this->database->get_fahrplaene_count(); ?></strong></p>
+                <p>PDF-Parsing: <strong><?php echo $this->pdf_parsing_enabled ? 'Aktiviert' : 'Nicht verfügbar'; ?></strong></p>
+                <?php if ($is_admin && $this->pdf_parsing_enabled): ?>
+                <p>Exklusionsliste: <strong><?php echo $word_count; ?> Wörter</strong></p>
+                <?php endif; ?>
+                <p>Linien-Mapping: <strong><?php echo $mapping_count; ?> Zuordnungen (Neu → Alt Format)</strong></p>
             </div>
             <?php endif; ?>
         </div>
@@ -842,6 +857,67 @@ montag dienstag mittwoch donnerstag freitag samstag sonntag"
         ?>
         <script>
         jQuery(document).ready(function($) {
+            // ✅ GEFIXT: Linien-Mapping speichern Event-Handler hinzugefügt
+            $('#save-line-mapping').on('click', function() {
+                var $btn = $(this);
+                var $status = $('#mapping-status');
+                var mappingText = $('#line-mapping').val();
+                
+                $btn.prop('disabled', true);
+                $status.html('<span style="color: orange;">Speichere Mapping...</span>');
+                
+                // Verwende fahrplanAdminCall falls verfügbar, sonst jQuery AJAX
+                if (typeof fahrplanAdminCall === 'function') {
+                    fahrplanAdminCall('save_line_mapping', {line_mapping: mappingText}, {
+                        success: function(response) {
+                            $status.html('<span style="color: green;">✓ Gespeichert (' + response.mapping_count + ' Zuordnungen)</span>');
+                            setTimeout(function() {
+                                $status.html('');
+                            }, 3000);
+                        },
+                        error: function(error) {
+                            $status.html('<span style="color: red;">✗ Fehler: ' + error.message + '</span>');
+                        },
+                        complete: function() {
+                            $btn.prop('disabled', false);
+                        }
+                    });
+                } else {
+                    // Fallback für direktes WordPress AJAX
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        dataType: 'json',
+                        data: {
+                            action: 'unified_ajax',
+                            module: 'fahrplanportal',
+                            module_action: 'save_line_mapping',
+                            line_mapping: mappingText,
+                            nonce: '<?php echo wp_create_nonce("unified_ajax_master_nonce"); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                $status.html('<span style="color: green;">✓ Gespeichert (' + response.data.mapping_count + ' Zuordnungen)</span>');
+                                setTimeout(function() {
+                                    $status.html('');
+                                }, 3000);
+                            } else {
+                                $status.html('<span style="color: red;">✗ Fehler: ' + response.data + '</span>');
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            $status.html('<span style="color: red;">✗ AJAX-Fehler: ' + error + '</span>');
+                        },
+                        complete: function() {
+                            $btn.prop('disabled', false);
+                        }
+                    });
+                }
+            });
+
+            // ✅ HINWEIS: Event-Handler für #update-mapping-in-db bereits in admin.js vorhanden
+            // Daher hier NICHT nochmal registrieren (würde doppelte confirm()-Dialoge verursachen)
+
             // Standard-Exklusionsliste Button
             $('#load-default-exclusions').on('click', function() {
                 var defaultExclusions = `aber alle allem allen aller alles also auch auf aus bei bin bis bist dass den der des die dies doch dort durch ein eine einem einen einer eines für hab hat hier ich ihr ihre ihrem ihren ihrer ihres ist mit nach nicht noch nur oder sich sie sind über und uns von war wird wir zu zum zur
@@ -1029,7 +1105,7 @@ ST3:STADT3
                     $status_display = '<span class="status-missing">❌ Fehlt</span>';
                     break;
                 case 'IMPORT':
-                    $status_display = '<span class="status-import" data-pdf-path="' . esc_attr($row->pdf_pfad) . '">📥 Import</span>';
+                    $status_display = '<span class="status-import" data-pdf-path="' . esc_attr($row->pdf_pfad) . '">🔥 Import</span>';
                     break;
                 default:
                     $status_display = '<span class="status-loading">⏳ Laden...</span>';

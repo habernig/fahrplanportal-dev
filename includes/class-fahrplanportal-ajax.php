@@ -415,9 +415,10 @@ class FahrplanPortal_Ajax {
     
     /**
      * ✅ UNIFIED: Datenbank neu erstellen
+     * ✅ GEÄNDERT: Berechtigung von manage_options auf edit_posts
      */
     public function unified_recreate_db() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
         }
         
@@ -430,9 +431,10 @@ class FahrplanPortal_Ajax {
     
     /**
      * ✅ UNIFIED: Alle Einträge löschen
+     * ✅ GEÄNDERT: Berechtigung von manage_options auf edit_posts
      */
     public function unified_clear_db() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
         }
         
@@ -495,9 +497,10 @@ class FahrplanPortal_Ajax {
     
     /**
      * ✅ AKTUALISIERT: Linien-Mapping speichern mit flexibler Validierung
+     * ✅ GEÄNDERT: Berechtigung von manage_options auf edit_posts
      */
     public function unified_save_line_mapping() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
         }
         
@@ -600,9 +603,10 @@ class FahrplanPortal_Ajax {
      * ✅ NEU: Mapping-Tabelle mit Datenbank abgleichen
      * Aktualisiert alle bestehenden Fahrpläne mit neuen Mapping-Zuordnungen
      * ohne PDF-Neuscan
+     * ✅ GEÄNDERT: Berechtigung von manage_options auf edit_posts
      */
     public function unified_update_mapping_in_db() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung für DB-Abgleich');
             return;
         }
@@ -740,9 +744,10 @@ class FahrplanPortal_Ajax {
     
     /**
      * ✅ AKTUALISIERT: Linien-Mapping laden mit flexibler Zählung
+     * ✅ GEÄNDERT: Berechtigung von manage_options auf edit_posts
      */
     public function unified_load_line_mapping() {
-        if (!current_user_can('manage_options')) {
+        if (!current_user_can('edit_posts')) {
             wp_send_json_error('Keine Berechtigung');
         }
         
