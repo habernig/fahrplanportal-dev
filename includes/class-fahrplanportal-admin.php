@@ -347,6 +347,26 @@ class FahrplanPortal_Admin {
                             <input type="text" id="edit-titel" name="titel" required>
                         </div>
                         
+                        
+                        
+                        
+                        
+                        <div class="fahrplan-form-row">
+                            <div class="fahrplan-form-group">
+                                <label for="edit-gueltig-von">Gültig von</label>
+                                <input type="date" id="edit-gueltig-von" name="gueltig_von">
+                            </div>
+                            <div class="fahrplan-form-group">
+                                <label for="edit-gueltig-bis">Gültig bis</label>
+                                <input type="date" id="edit-gueltig-bis" name="gueltig_bis">
+                            </div>
+                        </div>
+
+                        <div class="fahrplan-form-group">
+                            <label for="edit-kurzbeschreibung">Kurzbeschreibung</label>
+                            <textarea id="edit-kurzbeschreibung" name="kurzbeschreibung"></textarea>
+                        </div>
+
                         <div class="fahrplan-form-row">
                             <div class="fahrplan-form-group">
                                 <label for="edit-linie-alt">Linie Alt (4-stellig)</label>
@@ -360,27 +380,15 @@ class FahrplanPortal_Admin {
                             </div>
                         </div>
                         
-                        <div class="fahrplan-form-group">
-                            <label for="edit-kurzbeschreibung">Kurzbeschreibung</label>
-                            <textarea id="edit-kurzbeschreibung" name="kurzbeschreibung"></textarea>
-                        </div>
-                        
-                        <div class="fahrplan-form-row">
+                        <?php /* ?>
+
                             <div class="fahrplan-form-group">
-                                <label for="edit-gueltig-von">Gültig von</label>
-                                <input type="date" id="edit-gueltig-von" name="gueltig_von">
+                                <label for="edit-region">Region</label>
+                                <input type="text" id="edit-region" name="region" disabled>
                             </div>
-                            <div class="fahrplan-form-group">
-                                <label for="edit-gueltig-bis">Gültig bis</label>
-                                <input type="date" id="edit-gueltig-bis" name="gueltig_bis">
-                            </div>
-                        </div>
-                        
-                        <div class="fahrplan-form-group">
-                            <label for="edit-region">Region</label>
-                            <input type="text" id="edit-region" name="region">
-                        </div>
-                        
+
+                        <?php */ ?>
+
                         <?php if ($this->pdf_parsing_enabled): ?>
                             <div class="fahrplan-form-group">
                                 <label for="edit-tags">Tags (kommagetrennt)</label>

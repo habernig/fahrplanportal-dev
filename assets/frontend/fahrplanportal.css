@@ -48,19 +48,22 @@
 
 .fahrplanportal-reset {
     background-color: var(--fahrplanportal-danger);
-    border-color: var(--fahrplanportal-danger);
+    border-color: var(--fahrplanportal-border);
     font-weight: 500;
     transition: all 0.2s ease;
+    line-height: 1.35 !important;
 }
 
 .fahrplanportal-reset:hover {
     background-color: #bb2d3b;
     border-color: #b02a37;
     transform: translateY(-1px);
+    line-height: 1.35 !important;
 }
 
 .fahrplanportal-empty-state,
 .fahrplanportal-no-results {
+    display: none;
     text-align: center;
     padding: 3rem 1rem;
     background: white;
