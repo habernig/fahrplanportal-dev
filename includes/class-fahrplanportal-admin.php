@@ -68,6 +68,58 @@ class FahrplanPortal_Admin {
             array($this, 'db_maintenance_page')
         );
     }
+
+
+    /**
+     * ✅ NEU: Plugin-Version und Branch aus Root-Plugin-File auslesen
+     * Zeigt Version und Branch als Badge neben der Headline
+     */
+    private function get_plugin_version_badge() {
+        // Pfad zum Root-Plugin-File
+        $plugin_file = WP_PLUGIN_DIR . '/hd-kaerntner-linien/hd_kaerntner_linien.php';
+        
+        // Fallback falls Datei nicht existiert
+        if (!file_exists($plugin_file)) {
+            // Versuche alternativen Pfad
+            $plugin_file = WP_PLUGIN_DIR . '/hd-kaerntner-linien/index.php';
+            
+            if (!file_exists($plugin_file)) {
+                return '<small style="font-weight: normal; font-size: 12px; color: #666;">(Version unbekannt)</small>';
+            }
+        }
+        
+        // Plugin-Daten auslesen
+        $plugin_data = get_file_data($plugin_file, array(
+            'Version' => 'Version',
+            'GitHub Branch' => 'GitHub Branch'
+        ));
+        
+        $version = !empty($plugin_data['Version']) ? $plugin_data['Version'] : '?';
+        $branch = !empty($plugin_data['GitHub Branch']) ? $plugin_data['GitHub Branch'] : 'main';
+        
+        // Branch-Farbe bestimmen
+        $branch_color = '#666';
+        if ($branch === 'dev' || $branch === 'develop') {
+            $branch_color = '#d63638'; // Rot für Dev
+        } elseif ($branch === 'main' || $branch === 'master') {
+            $branch_color = '#00a32a'; // Grün für Main
+        } elseif (strpos($branch, 'feature') !== false) {
+            $branch_color = '#2271b1'; // Blau für Feature-Branches
+        }
+        
+        // Badge HTML erstellen
+        $badge = sprintf(
+            '<small style="font-weight: normal; font-size: 12px; margin-left: 10px;">
+                <span style="background: #f0f0f1; padding: 2px 8px; border-radius: 3px; color: #666;">v%s</span>
+                <span style="background: %s; color: white; padding: 2px 8px; border-radius: 3px; margin-left: 5px;">%s</span>
+            </small>',
+            esc_html($version),
+            esc_attr($branch_color),
+            esc_html($branch)
+        );
+        
+        return $badge;
+    }
     
     /**
      * Admin-Scripts laden - ✅ GEFIXT: Nur im relevanten Admin-Bereich
@@ -116,7 +168,7 @@ class FahrplanPortal_Admin {
         $available_folders = $this->get_available_folders();
         ?>
         <div class="wrap">
-            <h1>Fahrplanportal Verwaltung</h1>
+            <h1>Fahrplanportal Verwaltung <?php echo $this->get_plugin_version_badge(); ?></h1>
             
             <?php if (!$this->pdf_parsing_enabled): ?>
                 <div class="notice notice-warning">

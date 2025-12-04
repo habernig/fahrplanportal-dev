@@ -1694,7 +1694,7 @@ function initializeFahrplanportalAdmin() {
     // Beispiel-Mapping
     var exampleMapping = '// Beispiel Linien-Mapping: linie_alt:linie_neu\n// Kärnten Linien Beispiele:\n5000:100\n5001:101\n5002:102\n5003:103\n5004:104\n5005:105\n5006:106\n5007:107\n5008:108\n5009:109\n5010:110\n\n// Regionale Linien:\n5020:120\n5021:121\n5022:122\n5025:125\n\n// Stadtlinien:\n5100:200\n5101:201\n5102:202\n\n// Weitere Zuordnungen:\n5402:502\n5403:503\n5404:504';
     
-    // Admin Exklusionsliste speichern
+    /// Admin Exklusionsliste speichern
     $('#save-exclusion-words').on('click', function() {
         var $btn = $(this);
         var $status = $('#exclusion-status');
@@ -1709,11 +1709,12 @@ function initializeFahrplanportalAdmin() {
                 setTimeout(function() {
                     $status.html('');
                 }, 3000);
+                // ✅ FIX: Button hier aktivieren
+                $btn.prop('disabled', false);
             },
             error: function(error) {
                 $status.html('<span style="color: red;">✗ Admin Fehler: ' + error.message + '</span>');
-            },
-            complete: function() {
+                // ✅ FIX: Button auch bei Fehler aktivieren
                 $btn.prop('disabled', false);
             }
         });

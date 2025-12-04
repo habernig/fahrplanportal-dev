@@ -599,69 +599,125 @@ class FahrplanPortal_Ajax {
     }
 
 
-    /**
-     * ✅ NEU: Mapping-Tabelle mit Datenbank abgleichen
-     * Aktualisiert alle bestehenden Fahrpläne mit neuen Mapping-Zuordnungen
-     * ohne PDF-Neuscan
-     * ✅ GEÄNDERT: Berechtigung von manage_options auf edit_posts
-     */
-    public function unified_update_mapping_in_db() {
-        if (!current_user_can('edit_posts')) {
-            wp_send_json_error('Keine Berechtigung für DB-Abgleich');
-            return;
-        }
-        
-        error_log('FAHRPLANPORTAL: 🔄 Starte Mapping-DB-Abgleich');
-        
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'fahrplaene';
-        
-        // 1. Aktuelles Mapping laden und parsen
-        $mapping_array = $this->utils->get_line_mapping();
 
-        if (empty($mapping_array)) {
-            wp_send_json_error('Keine Mapping-Konfiguration gefunden oder Parsing fehlgeschlagen');
-            return;
-        }
-        
-        error_log("FAHRPLANPORTAL: ✅ " . count($mapping_array) . " Mapping-Einträge geladen");
-        
-        // 3. Alle Fahrpläne aus DB laden
-        $all_fahrplaene = $wpdb->get_results(
-            "SELECT id, titel, linie_neu, linie_alt FROM {$table_name} ORDER BY id ASC"
-        );
-        
-        if (empty($all_fahrplaene)) {
-            wp_send_json_error('Keine Fahrpläne in der Datenbank gefunden');
-            return;
-        }
-        
-        error_log("FAHRPLANPORTAL: 📊 " . count($all_fahrplaene) . " Fahrpläne zum Abgleich gefunden");
-        
-        // 4. Änderungen sammeln und durchführen
-        $updates_performed = 0;
-        $updates_failed = 0;
-        $no_mapping_found = 0;
-        $already_correct = 0;
-        $change_details = array();
-        
-        foreach ($all_fahrplaene as $fahrplan) {
-            $id = $fahrplan->id;
-            $titel = $fahrplan->titel;
-            $linie_neu = $fahrplan->linie_neu;
-            $current_linie_alt = $fahrplan->linie_alt;
+/**
+ * ✅ ERWEITERT: Mapping-Tabelle mit Datenbank abgleichen (v4)
+ * 
+ * Das Mapping ist die "einzige Wahrheit":
+ * - FALL A: linie_neu vorhanden → linie_alt wird aus Mapping gesetzt/korrigiert
+ * - FALL B: linie_alt vorhanden, linie_neu leer → linie_neu wird aus Reverse-Mapping gesetzt
+ * - FALL C: linie_alt vorhanden, linie_neu falsch → linie_neu wird aus Reverse-Mapping korrigiert
+ * 
+ * ✅ NEU v4: Unterstützt GV-Suffix und andere Suffixe in linie_alt
+ * 
+ * Bidirektionale Synchronisation ohne PDF-Neuscan
+ */
+public function unified_update_mapping_in_db() {
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('Keine Berechtigung für DB-Abgleich');
+        return;
+    }
+    
+    error_log('FAHRPLANPORTAL: 🔄 Starte Mapping-DB-Abgleich (v4 - mit GV-Suffix Support)');
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'fahrplaene';
+    
+    // 1. Aktuelles Mapping laden und parsen (neu → alt)
+    $mapping_array = $this->utils->get_line_mapping();
+
+    if (empty($mapping_array)) {
+        wp_send_json_error('Keine Mapping-Konfiguration gefunden oder Parsing fehlgeschlagen');
+        return;
+    }
+    
+    error_log("FAHRPLANPORTAL: ✅ " . count($mapping_array) . " Mapping-Einträge geladen (neu → alt)");
+    
+    // 2. Reverse-Mapping erstellen (alt → neu)
+    //    ✅ NEU: Auch Basis-Nummern ohne Suffix mappen
+    $reverse_mapping = array();
+    $reverse_mapping_full = array(); // Speichert den vollen linie_alt Wert
+    
+    foreach ($mapping_array as $neu => $alt) {
+        // Nur wenn alt nicht "keine" ist
+        if (strtolower($alt) !== 'keine') {
+            $alt_trimmed = trim($alt);
             
-            // Überspringe wenn linie_neu leer
-            if (empty($linie_neu)) {
-                continue;
+            // Exakter Match (z.B. "8110 GV" → 126)
+            $reverse_mapping[$alt_trimmed] = $neu;
+            $reverse_mapping_full[$alt_trimmed] = $alt_trimmed;
+            
+            // ✅ NEU: Basis-Nummer extrahieren (ohne GV, ohne Suffix)
+            // Extrahiert die führende Zahl aus Strings wie "8110 GV", "8106/08 GV", "5108"
+            if (preg_match('/^(\d+)/', $alt_trimmed, $matches)) {
+                $basis_nummer = $matches[1];
+                
+                // Nur hinzufügen wenn noch nicht vorhanden (erster Match gewinnt)
+                if (!isset($reverse_mapping[$basis_nummer])) {
+                    $reverse_mapping[$basis_nummer] = $neu;
+                    $reverse_mapping_full[$basis_nummer] = $alt_trimmed; // Speichert vollen Wert für DB-Update
+                    error_log("FAHRPLANPORTAL: 📝 Reverse-Mapping Basis: '$basis_nummer' → '$neu' (voll: '$alt_trimmed')");
+                }
             }
-            
-            // 5. Neue linie_alt über Mapping ermitteln
-            $new_linie_alt = '';
+        }
+    }
+    
+    error_log("FAHRPLANPORTAL: ✅ " . count($reverse_mapping) . " Reverse-Mapping-Einträge erstellt (inkl. Basis-Nummern)");
+    
+    // 3. Alle Fahrpläne aus DB laden
+    $all_fahrplaene = $wpdb->get_results(
+        "SELECT id, titel, linie_neu, linie_alt FROM {$table_name} ORDER BY id ASC"
+    );
+    
+    if (empty($all_fahrplaene)) {
+        wp_send_json_error('Keine Fahrpläne in der Datenbank gefunden');
+        return;
+    }
+    
+    error_log("FAHRPLANPORTAL: 📊 " . count($all_fahrplaene) . " Fahrpläne zum Abgleich gefunden");
+    
+    // 4. Statistik-Variablen
+    $updates_performed = 0;
+    $updates_failed = 0;
+    $no_mapping_found = 0;
+    $already_correct = 0;
+    $skipped_both_empty = 0;
+    $updated_linie_alt = 0;
+    $updated_linie_neu = 0;
+    $updated_linie_alt_with_suffix = 0;
+    $conflicts_linie_alt = 0;
+    $conflicts_linie_neu = 0;
+    $change_details = array();
+    $conflict_details = array();
+    
+    foreach ($all_fahrplaene as $fahrplan) {
+        $id = $fahrplan->id;
+        $titel = $fahrplan->titel;
+        $current_linie_neu = trim($fahrplan->linie_neu ?? '');
+        $current_linie_alt = trim($fahrplan->linie_alt ?? '');
+        
+        // ✅ Beide Felder leer → überspringen mit Zählung
+        if (empty($current_linie_neu) && empty($current_linie_alt)) {
+            $skipped_both_empty++;
+            continue;
+        }
+        
+        // Tracking für diesen Fahrplan
+        $update_data = array();
+        $fahrplan_changes = array();
+        $fahrplan_is_correct = true;
+        $fahrplan_no_mapping = true;
+        
+        // =====================================================
+        // FALL A: linie_neu ist befüllt
+        //         → linie_alt aus Mapping ableiten/korrigieren
+        // =====================================================
+        if (!empty($current_linie_neu)) {
+            $expected_linie_alt = '';
             
             // Mehrere Linien in linie_neu? (kommagetrennt)
-            if (strpos($linie_neu, ',') !== false) {
-                $linie_neu_array = array_map('trim', explode(',', $linie_neu));
+            if (strpos($current_linie_neu, ',') !== false) {
+                $linie_neu_array = array_map('trim', explode(',', $current_linie_neu));
                 $alte_nummern = array();
                 
                 foreach ($linie_neu_array as $einzelne_linie) {
@@ -672,75 +728,217 @@ class FahrplanPortal_Ajax {
                     }
                 }
                 
-                $new_linie_alt = implode(', ', $alte_nummern);
+                $expected_linie_alt = implode(', ', $alte_nummern);
             } 
             // Einzelne Linie
             else {
-                $gemappte_alte = $this->utils->lookup_mapping($linie_neu, $mapping_array);
+                $gemappte_alte = $this->utils->lookup_mapping($current_linie_neu, $mapping_array);
                 
                 if ($gemappte_alte !== null && strtolower($gemappte_alte) !== 'keine') {
-                    $new_linie_alt = $gemappte_alte;
+                    $expected_linie_alt = $gemappte_alte;
                 }
             }
             
-            // 6. Vergleich und Update
-            if (empty($new_linie_alt)) {
-                $no_mapping_found++;
-                error_log("FAHRPLANPORTAL: ⚠️ Kein Mapping für ID $id (linie_neu: '$linie_neu')");
-                continue;
-            }
-            
-            // Bereits korrekt?
-            if ($current_linie_alt === $new_linie_alt) {
-                $already_correct++;
-                continue;
-            }
-            
-            // Update durchführen
-            $update_result = $wpdb->update(
-                $table_name,
-                array('linie_alt' => $new_linie_alt),
-                array('id' => $id),
-                array('%s'),
-                array('%d')
-            );
-            
-            if ($update_result !== false) {
-                $updates_performed++;
-                $change_details[] = array(
-                    'id' => $id,
-                    'titel' => $titel,
-                    'linie_neu' => $linie_neu,
-                    'old_linie_alt' => $current_linie_alt,
-                    'new_linie_alt' => $new_linie_alt
-                );
+            // Prüfen ob Update nötig
+            if (!empty($expected_linie_alt)) {
+                $fahrplan_no_mapping = false;
                 
-                error_log("FAHRPLANPORTAL: ✅ Update ID $id: '$current_linie_alt' → '$new_linie_alt'");
-            } else {
-                $updates_failed++;
-                error_log("FAHRPLANPORTAL: ❌ Update fehlgeschlagen für ID $id");
+                if ($expected_linie_alt !== $current_linie_alt) {
+                    $fahrplan_is_correct = false;
+                    $update_data['linie_alt'] = $expected_linie_alt;
+                    
+                    // Konflikt wenn linie_alt bereits befüllt war
+                    $is_conflict = !empty($current_linie_alt);
+                    if ($is_conflict) {
+                        $conflicts_linie_alt++;
+                        $conflict_details[] = array(
+                            'id' => $id,
+                            'titel' => $titel,
+                            'field' => 'linie_alt',
+                            'old_value' => $current_linie_alt,
+                            'new_value' => $expected_linie_alt,
+                            'reason' => "Mapping ($current_linie_neu → $expected_linie_alt) überschreibt"
+                        );
+                        error_log("FAHRPLANPORTAL: ⚠️ KONFLIKT ID $id: linie_alt '$current_linie_alt' wird zu '$expected_linie_alt'");
+                    }
+                    
+                    $fahrplan_changes[] = array(
+                        'field' => 'linie_alt',
+                        'direction' => 'neu→alt',
+                        'old' => $current_linie_alt,
+                        'new' => $expected_linie_alt,
+                        'was_conflict' => $is_conflict
+                    );
+                }
             }
         }
         
-        // 7. Ergebnis zusammenfassen
-        $summary = array(
-            'total_fahrplaene' => count($all_fahrplaene),
-            'updates_performed' => $updates_performed,
-            'updates_failed' => $updates_failed,
-            'no_mapping_found' => $no_mapping_found,
-            'already_correct' => $already_correct,
-            'mapping_entries' => count($mapping_array),
-            'change_details' => array_slice($change_details, 0, 10) // Nur erste 10 Details
-        );
+        // =====================================================
+        // FALL B + C: linie_alt ist befüllt
+        //             → linie_neu aus Reverse-Mapping ableiten
+        //             → AUCH wenn linie_neu bereits (falsch) befüllt ist!
+        //             ✅ NEU: Auch linie_alt mit vollem Suffix aktualisieren
+        // =====================================================
+        if (!empty($current_linie_alt)) {
+            $expected_linie_neu = '';
+            $expected_linie_alt_full = ''; // ✅ NEU: Voller Wert mit Suffix
+            
+            // Mehrere alte Linien? (kommagetrennt)
+            if (strpos($current_linie_alt, ',') !== false) {
+                $linie_alt_array = array_map('trim', explode(',', $current_linie_alt));
+                $neue_nummern = array();
+                $alte_nummern_full = array();
+                
+                foreach ($linie_alt_array as $einzelne_alte) {
+                    if (isset($reverse_mapping[$einzelne_alte])) {
+                        $neue_nummern[] = $reverse_mapping[$einzelne_alte];
+                        $alte_nummern_full[] = $reverse_mapping_full[$einzelne_alte] ?? $einzelne_alte;
+                    }
+                }
+                
+                $expected_linie_neu = implode(', ', $neue_nummern);
+                $expected_linie_alt_full = implode(', ', $alte_nummern_full);
+            }
+            // Einzelne alte Linie
+            else {
+                if (isset($reverse_mapping[$current_linie_alt])) {
+                    $expected_linie_neu = $reverse_mapping[$current_linie_alt];
+                    $expected_linie_alt_full = $reverse_mapping_full[$current_linie_alt] ?? $current_linie_alt;
+                }
+            }
+            
+            // Prüfen ob Update nötig für linie_neu
+            if (!empty($expected_linie_neu)) {
+                $fahrplan_no_mapping = false;
+                
+                if ($expected_linie_neu !== $current_linie_neu) {
+                    $fahrplan_is_correct = false;
+                    $update_data['linie_neu'] = $expected_linie_neu;
+                    
+                    // Konflikt wenn linie_neu bereits (falsch) befüllt war
+                    $is_conflict = !empty($current_linie_neu);
+                    if ($is_conflict) {
+                        $conflicts_linie_neu++;
+                        $conflict_details[] = array(
+                            'id' => $id,
+                            'titel' => $titel,
+                            'field' => 'linie_neu',
+                            'old_value' => $current_linie_neu,
+                            'new_value' => $expected_linie_neu,
+                            'reason' => "Reverse-Mapping ($current_linie_alt → $expected_linie_neu) überschreibt"
+                        );
+                        error_log("FAHRPLANPORTAL: ⚠️ KONFLIKT ID $id: linie_neu '$current_linie_neu' wird zu '$expected_linie_neu' (aus linie_alt '$current_linie_alt')");
+                    }
+                    
+                    $fahrplan_changes[] = array(
+                        'field' => 'linie_neu',
+                        'direction' => 'alt→neu',
+                        'old' => $current_linie_neu,
+                        'new' => $expected_linie_neu,
+                        'was_conflict' => $is_conflict
+                    );
+                }
+                
+                // ✅ NEU: Auch linie_alt mit vollem Suffix aktualisieren wenn nötig
+                if (!empty($expected_linie_alt_full) && $expected_linie_alt_full !== $current_linie_alt) {
+                    // Nur wenn linie_alt nicht bereits durch Fall A gesetzt wird
+                    if (!isset($update_data['linie_alt'])) {
+                        $update_data['linie_alt'] = $expected_linie_alt_full;
+                        $updated_linie_alt_with_suffix++;
+                        
+                        $fahrplan_changes[] = array(
+                            'field' => 'linie_alt',
+                            'direction' => 'suffix-ergänzung',
+                            'old' => $current_linie_alt,
+                            'new' => $expected_linie_alt_full,
+                            'was_conflict' => false
+                        );
+                        
+                        error_log("FAHRPLANPORTAL: 📝 ID $id: linie_alt '$current_linie_alt' → '$expected_linie_alt_full' (Suffix ergänzt)");
+                    }
+                }
+            }
+        }
         
-        error_log("FAHRPLANPORTAL: 🎯 Mapping-DB-Abgleich abgeschlossen:");
-        error_log("FAHRPLANPORTAL:    Updates: $updates_performed");
-        error_log("FAHRPLANPORTAL:    Fehlgeschlagen: $updates_failed"); 
-        error_log("FAHRPLANPORTAL:    Kein Mapping: $no_mapping_found");
-        error_log("FAHRPLANPORTAL:    Bereits korrekt: $already_correct");
-        
-        wp_send_json_success($summary);
+        // =====================================================
+        // UPDATE DURCHFÜHREN (wenn nötig)
+        // =====================================================
+        if (!empty($update_data)) {
+            $result = $wpdb->update(
+                $table_name,
+                $update_data,
+                array('id' => $id),
+                array_fill(0, count($update_data), '%s'),
+                array('%d')
+            );
+            
+            if ($result !== false) {
+                $updates_performed++;
+                
+                // Zähler aktualisieren
+                if (isset($update_data['linie_alt'])) {
+                    $updated_linie_alt++;
+                }
+                if (isset($update_data['linie_neu'])) {
+                    $updated_linie_neu++;
+                }
+                
+                // Change-Details sammeln
+                $change_details[] = array(
+                    'id' => $id,
+                    'titel' => $titel,
+                    'changes' => $fahrplan_changes
+                );
+                
+                error_log("FAHRPLANPORTAL: ✏️ ID $id aktualisiert: " . json_encode($update_data));
+            } else {
+                $updates_failed++;
+                error_log("FAHRPLANPORTAL: ❌ Update fehlgeschlagen für ID $id: " . $wpdb->last_error);
+            }
+        } elseif ($fahrplan_is_correct && !$fahrplan_no_mapping) {
+            $already_correct++;
+        } elseif ($fahrplan_no_mapping) {
+            $no_mapping_found++;
+            error_log("FAHRPLANPORTAL: ⚠️ Kein Mapping für ID $id (linie_neu: '$current_linie_neu', linie_alt: '$current_linie_alt')");
+        }
     }
+    
+    // 5. Ergebnis zusammenfassen
+    $summary = array(
+        'total_fahrplaene' => count($all_fahrplaene),
+        'updates_performed' => $updates_performed,
+        'updated_linie_alt' => $updated_linie_alt,
+        'updated_linie_neu' => $updated_linie_neu,
+        'updated_linie_alt_with_suffix' => $updated_linie_alt_with_suffix,
+        'conflicts_resolved' => $conflicts_linie_alt + $conflicts_linie_neu,
+        'conflicts_linie_alt' => $conflicts_linie_alt,
+        'conflicts_linie_neu' => $conflicts_linie_neu,
+        'updates_failed' => $updates_failed,
+        'no_mapping_found' => $no_mapping_found,
+        'already_correct' => $already_correct,
+        'skipped_both_empty' => $skipped_both_empty,
+        'mapping_entries' => count($mapping_array),
+        'reverse_mapping_entries' => count($reverse_mapping),
+        'change_details' => array_slice($change_details, 0, 15),
+        'conflict_details' => array_slice($conflict_details, 0, 10)
+    );
+    
+    error_log("FAHRPLANPORTAL: 🎯 Mapping-DB-Abgleich (v4) abgeschlossen:");
+    error_log("FAHRPLANPORTAL:    Updates gesamt: $updates_performed");
+    error_log("FAHRPLANPORTAL:    - linie_alt aktualisiert: $updated_linie_alt (davon $updated_linie_alt_with_suffix mit Suffix)");
+    error_log("FAHRPLANPORTAL:    - linie_neu aktualisiert: $updated_linie_neu");
+    error_log("FAHRPLANPORTAL:    Konflikte gelöst: " . ($conflicts_linie_alt + $conflicts_linie_neu));
+    error_log("FAHRPLANPORTAL:    - linie_alt überschrieben: $conflicts_linie_alt");
+    error_log("FAHRPLANPORTAL:    - linie_neu überschrieben: $conflicts_linie_neu");
+    error_log("FAHRPLANPORTAL:    Fehlgeschlagen: $updates_failed"); 
+    error_log("FAHRPLANPORTAL:    Kein Mapping: $no_mapping_found");
+    error_log("FAHRPLANPORTAL:    Bereits korrekt: $already_correct");
+    error_log("FAHRPLANPORTAL:    Übersprungen (beide leer): $skipped_both_empty");
+    
+    wp_send_json_success($summary);
+}
+
+
     
     /**
      * ✅ AKTUALISIERT: Linien-Mapping laden mit flexibler Zählung

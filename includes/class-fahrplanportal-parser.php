@@ -139,12 +139,24 @@ class FahrplanPortal_Parser {
             $tags = $this->extract_pdf_tags($full_pdf_path);
         }
         
+        // ✅ NEU: GV-Erkennung → Kurzbeschreibung setzen
+        $kurzbeschreibung = '';
+        $linie_neu = $parsed['linie_neu'];
+
+        if (!empty($linie_neu)) {
+            // Prüfe auf GV am Anfang (GV126) oder am Ende (126GV)
+            if (preg_match('/^GV/i', $linie_neu) || preg_match('/GV$/i', $linie_neu)) {
+                $kurzbeschreibung = 'Gelegenheitsverkehr';
+                error_log("FAHRPLANPORTAL: 🚌 GV erkannt in '$linie_neu' → Kurzbeschreibung: Gelegenheitsverkehr");
+            }
+        }
+
         // Daten-Array vorbereiten
         $data = array(
             'titel' => $parsed['titel'],
             'linie_alt' => $parsed['linie_alt'],
             'linie_neu' => $parsed['linie_neu'],
-            'kurzbeschreibung' => '',
+            'kurzbeschreibung' => $kurzbeschreibung,
             'gueltig_von' => $parsed['gueltig_von'],
             'gueltig_bis' => $parsed['gueltig_bis'],
             'pdf_pfad' => $pdf_pfad,
@@ -418,11 +430,21 @@ class FahrplanPortal_Parser {
             
             $titel = implode(' — ', $orte_formatted);
             
+            // ✅ NEU: Prüfen ob GV in Liniennummer → Kurzbeschreibung setzen
+            $kurzbeschreibung = '';
+            if (!empty($linie_neu)) {
+                // Prüfe auf GV am Anfang (GV126) oder am Ende (126GV)
+                if (preg_match('/^GV/i', $linie_neu) || preg_match('/GV$/i', $linie_neu)) {
+                    $kurzbeschreibung = 'Gelegenheitsverkehr';
+                    error_log("FAHRPLANPORTAL: 🚌 GV erkannt in '$linie_neu' → Kurzbeschreibung: Gelegenheitsverkehr");
+                }
+            }
+
             $result = array(
                 'titel' => $titel,
                 'linie_alt' => $linie_alt,
                 'linie_neu' => $linie_neu,
-                'kurzbeschreibung' => '',
+                'kurzbeschreibung' => $kurzbeschreibung,
                 'gueltig_von' => '',
                 'gueltig_bis' => ''
             );
