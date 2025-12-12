@@ -105,7 +105,12 @@ class FahrplanPortal_Ajax {
         $all_files = $this->parser->collect_all_scan_files($base_scan_path, $folder);
         
         $total_files = count($all_files);
-        $chunk_size = 10; // 10 PDFs pro Chunk
+        
+        // ✅ FIX: chunk_size aus Settings laden statt hardcoded
+        $settings = get_option('fahrplanportal_settings', array());
+        $chunk_size = isset($settings['scan_chunk_size']) ? intval($settings['scan_chunk_size']) : 10;
+        $chunk_size = max(1, min(50, $chunk_size)); // Sicherheit: zwischen 1 und 50
+        
         $total_chunks = ceil($total_files / $chunk_size);
         
         // Regionen-Statistik

@@ -121,8 +121,14 @@ class FahrplanPortal_Admin {
         return $badge;
     }
     
+
     /**
      * Admin-Scripts laden - ✅ GEFIXT: Nur im relevanten Admin-Bereich
+     */
+
+    
+    /**
+     * Admin-Scripts laden - ✅ MODULAR: 7 separate JS-Module
      */
     public function enqueue_admin_scripts($hook) {
         // ✅ GEFIXT: Nur auf Fahrplan-Admin-Seiten laden
@@ -132,33 +138,114 @@ class FahrplanPortal_Admin {
         
         wp_enqueue_script('jquery');
         
+        $version = '3.0.0'; // ✅ Version erhöht für modulare Struktur
+        $admin_js_path = plugins_url('assets/admin/', dirname(__FILE__));
+        
+        // ========================================
+        // ✅ MODULARE JS-STRUKTUR (7 Module)
+        // ========================================
+        
+        // 1. Core-Modul (MUSS zuerst geladen werden - Namespace, AJAX-Helper)
         wp_enqueue_script(
-            'fahrplanportal-admin',
-            plugins_url('assets/admin/admin.js', dirname(__FILE__)),
+            'fahrplanportal-admin-core',
+            $admin_js_path . 'admin-core.js',
             array('jquery'),
-            '2.5.0', // ✅ Version erhöht für Chunked Scanning
+            $version,
             true
         );
         
-        // ✅ GEFIXT: Unified AJAX Config nur für Admin
-        wp_localize_script('fahrplanportal-admin', 'fahrplanportal_unified', array(
+        // 2. DataTable-Modul (DataTables, Region-Filter mit sessionStorage)
+        wp_enqueue_script(
+            'fahrplanportal-admin-datatable',
+            $admin_js_path . 'admin-datatable.js',
+            array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+        
+        // 3. Modal-Modul (Edit-Modal, Speichern, Löschen)
+        wp_enqueue_script(
+            'fahrplanportal-admin-modal',
+            $admin_js_path . 'admin-modal.js',
+            array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+        
+        // 4. DB-Maintenance-Modul (Exklusionsliste, Mapping, DB-Wartung)
+        wp_enqueue_script(
+            'fahrplanportal-admin-db-maintenance',
+            $admin_js_path . 'admin-db-maintenance.js',
+            array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+        
+        // 5. Sync-Modul (Tabellen-Sync, fehlende PDFs, Import)
+        wp_enqueue_script(
+            'fahrplanportal-admin-sync',
+            $admin_js_path . 'admin-sync.js',
+            array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+        
+        // 6. Tags-Modul (Tag-Analyse)
+        wp_enqueue_script(
+            'fahrplanportal-admin-tags',
+            $admin_js_path . 'admin-tags.js',
+            array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+        
+        // 7. Scanning-Modul (Chunked Scanning, Progress Bar, Fehlerprotokoll)
+        wp_enqueue_script(
+            'fahrplanportal-admin-scanning',
+            $admin_js_path . 'admin-scanning.js',
+            array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+        
+        // ========================================
+        // ✅ ALTE MONOLITHISCHE admin.js (DEAKTIVIERT)
+        // ========================================
+        /*
+        wp_enqueue_script(
+            'fahrplanportal-admin',
+            $admin_js_path . 'admin.js',
+            array('jquery'),
+            '2.5.0',
+            true
+        );
+        */
+        
+        // ✅ Settings laden für chunk_size
+        $settings = get_option('fahrplanportal_settings', array());
+        $scan_chunk_size = isset($settings['scan_chunk_size']) ? intval($settings['scan_chunk_size']) : 10;
+
+        // ✅ Unified AJAX Config für Core-Modul
+        wp_localize_script('fahrplanportal-admin-core', 'fahrplanportal_unified', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('unified_ajax_master_nonce'),
             'action' => 'unified_ajax',
             'module' => 'fahrplanportal',
             'pdf_parsing_enabled' => $this->pdf_parsing_enabled,
             'debug' => defined('WP_DEBUG') && WP_DEBUG,
-            'context' => 'admin_fahrplanportal_chunked'
+            'context' => 'admin_fahrplanportal_chunked',
+            'scan_chunk_size' => $scan_chunk_size  // ✅ NEU
         ));
         
+        // Admin CSS
         wp_enqueue_style(
             'fahrplanportal-admin',
-            plugins_url('assets/admin/admin.css', dirname(__FILE__)),
+            $admin_js_path . 'admin.css',
             array(),
-            '2.5.0'
+            $version
         );
         
-        error_log('✅ FAHRPLANPORTAL: Admin-Scripts geladen für: ' . $hook);
+        error_log('✅ FAHRPLANPORTAL: Admin-Scripts (modular) geladen für: ' . $hook);
     }
     
     /**

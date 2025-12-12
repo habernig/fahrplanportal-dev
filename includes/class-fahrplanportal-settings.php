@@ -19,6 +19,7 @@ class FahrplanPortal_Settings {
     private $default_settings = array(
         'hide_results_until_search' => 1,
         'disable_validity_check' => 0,
+        'scan_chunk_size' => 10,
     );
     
     public function __construct() {
@@ -55,6 +56,10 @@ class FahrplanPortal_Settings {
         $settings = array();
         $settings['hide_results_until_search'] = isset($_POST['hide_results_until_search']) && $_POST['hide_results_until_search'] === '1' ? 1 : 0;
         $settings['disable_validity_check'] = isset($_POST['disable_validity_check']) && $_POST['disable_validity_check'] === '1' ? 1 : 0;
+        
+        // Chunk-Size (zwischen 1 und 50, Default 10)
+        $chunk_size = isset($_POST['scan_chunk_size']) ? intval($_POST['scan_chunk_size']) : 10;
+        $settings['scan_chunk_size'] = max(1, min(50, $chunk_size));
         
         update_option(self::OPTION_NAME, $settings);
         
@@ -162,6 +167,29 @@ class FahrplanPortal_Settings {
                                     </td>
                                 </tr>
                                 
+                                <!-- Feld 3: Scan Chunk-Size -->
+                                <tr>
+                                    <th scope="row">Scan Chunk-Size</th>
+                                    <td>
+                                        <fieldset>
+                                            <input type="number" 
+                                                   name="scan_chunk_size" 
+                                                   id="scan_chunk_size" 
+                                                   value="<?php echo esc_attr($settings['scan_chunk_size']); ?>"
+                                                   min="1" 
+                                                   max="50" 
+                                                   step="1"
+                                                   class="small-text">
+                                            <label for="scan_chunk_size">PDFs pro Chunk</label>
+                                            <p class="description">
+                                                Anzahl der PDFs, die pro Chunk beim Verzeichnis-Scan verarbeitet werden.
+                                                <br><strong>Empfohlen:</strong> 10 (Standard). Höhere Werte = schneller, aber mehr Serverbelastung.
+                                                <br><strong>Bereich:</strong> 1-50 PDFs pro Chunk.
+                                            </p>
+                                        </fieldset>
+                                    </td>
+                                </tr>
+                                
                             </tbody>
                         </table>
                     </div>
@@ -196,7 +224,8 @@ class FahrplanPortal_Settings {
                     action: 'fahrplanportal_save_settings',
                     nonce: $('#fahrplanportal_settings_nonce').val(),
                     hide_results_until_search: $('#hide_results_until_search').is(':checked') ? '1' : '0',
-                    disable_validity_check: $('#disable_validity_check').is(':checked') ? '1' : '0'
+                    disable_validity_check: $('#disable_validity_check').is(':checked') ? '1' : '0',
+                    scan_chunk_size: $('#scan_chunk_size').val()
                 };
                 
                 $.post(ajaxurl, data, function(response) {
