@@ -1,45 +1,37 @@
 /**
  * Fahrplanportal Frontend JavaScript
- * Externe JavaScript-Datei für das Fahrplanportal
+ * ✅ VERBESSERT: Unterstützt Unified Ajax System UND Direct AJAX
+ * ✅ NEU: hideResultsUntilSearch-Setting für bedingte Anzeige des Results-Containers
  */
 
-console.log("🚀 Fahrplanportal External JavaScript geladen");
-
-// Globale Initialisierungsfunktion
 window.fahrplanportalInit = function(uniqueId) {
-    console.log("🚀 Fahrplanportal Script lädt für:", uniqueId);
-
     jQuery(document).ready(function($) {
-        // Konfiguration aus globalem Objekt holen
-        var config = window.fahrplanportalConfigs && window.fahrplanportalConfigs[uniqueId];
+        var config = window.fahrplanportalConfigs[uniqueId];
+        
         if (!config) {
-            console.error("❌ Keine Konfiguration für", uniqueId);
+            console.error("❌ Keine Konfiguration für Fahrplanportal gefunden: " + uniqueId);
             return;
         }
         
+        console.log("🚀 Fahrplanportal Init:", uniqueId, config);
+        
         var maxResults = config.maxResults || 100;
+        var predefinedRegion = config.predefinedRegion || false;
+        var hideResultsUntilSearch = config.hideResultsUntilSearch || false;  // ✅ NEU
         
-        console.log("🔧 Config:", {
-            uniqueId: uniqueId,
-            maxResults: maxResults,
-            unifiedAjax: typeof UnifiedAjax,
-            unifiedAPI: typeof UnifiedAjaxAPI,
-            directConfig: typeof fahrplanportal_direct
-        });
+        var performSearch = null;
+        var performAutocomplete = null;
         
-        // Globale Funktions-Variablen im äußeren Scope
-        var performSearch;
-        var performAutocomplete;
-        
-        // Intelligente System-Wahl
-        if (typeof UnifiedAjaxAPI !== "undefined" && typeof UnifiedAjaxAPI.fahrplanportal_frontend !== "undefined") {
-            console.log("🚀 Verwende Unified System");
+        // Unified System Check
+        if (typeof window.UnifiedAjaxAPI !== 'undefined' && 
+            typeof window.UnifiedAjaxAPI.fahrplanportal_frontend !== 'undefined') {
+            console.log("✅ Unified System verfügbar - nutze UnifiedAjaxAPI");
             initUnified();
-        } else if (typeof fahrplanportal_direct !== "undefined") {
-            console.log("🔄 Verwende direkten Fallback");
+        } else if (typeof fahrplanportal_direct !== 'undefined') {
+            console.log("⚠️ Unified System nicht verfügbar - nutze Direct AJAX");
             initDirect();
         } else {
-            console.error("❌ Kein System verfügbar!");
+            console.error("❌ Kein AJAX-System verfügbar!");
             showError();
         }
         
@@ -50,6 +42,7 @@ window.fahrplanportalInit = function(uniqueId) {
             var $resetBtn = $container.find('.fahrplanportal-reset');
             var $autocompleteDropdown = $container.find('.autocomplete-dropdown');
             
+            var $resultsWrapper = $container.find('.fahrplanportal-results');  // ✅ NEU: Results-Wrapper
             var $emptyState = $container.find('.fahrplanportal-empty-state');
             var $loading = $container.find('.fahrplanportal-loading');
             var $noResults = $container.find('.fahrplanportal-no-results');
@@ -65,8 +58,18 @@ window.fahrplanportalInit = function(uniqueId) {
                 console.log('🔍 Unified Suche:', {region: region, searchText: searchText});
                 
                 if (!region && !searchText) {
-                    showEmptyState();
+                    // ✅ NEU: Bei Reset - wenn hideResultsUntilSearch aktiv, Container wieder verstecken
+                    if (hideResultsUntilSearch && !predefinedRegion) {
+                        $resultsWrapper.hide();
+                    } else {
+                        showEmptyState();
+                    }
                     return;
+                }
+                
+                // ✅ NEU: Results-Container einblenden bei erster Suche
+                if (hideResultsUntilSearch && !predefinedRegion) {
+                    $resultsWrapper.show();
                 }
                 
                 showLoading();
@@ -127,6 +130,7 @@ window.fahrplanportalInit = function(uniqueId) {
             var $resetBtn = $container.find('.fahrplanportal-reset');
             var $autocompleteDropdown = $container.find('.autocomplete-dropdown');
             
+            var $resultsWrapper = $container.find('.fahrplanportal-results');  // ✅ NEU: Results-Wrapper
             var $emptyState = $container.find('.fahrplanportal-empty-state');
             var $loading = $container.find('.fahrplanportal-loading');
             var $noResults = $container.find('.fahrplanportal-no-results');
@@ -142,8 +146,18 @@ window.fahrplanportalInit = function(uniqueId) {
                 console.log('🔍 Direct Suche:', {region: region, searchText: searchText});
                 
                 if (!region && !searchText) {
-                    showEmptyState();
+                    // ✅ NEU: Bei Reset - wenn hideResultsUntilSearch aktiv, Container wieder verstecken
+                    if (hideResultsUntilSearch && !predefinedRegion) {
+                        $resultsWrapper.hide();
+                    } else {
+                        showEmptyState();
+                    }
                     return;
+                }
+                
+                // ✅ NEU: Results-Container einblenden bei erster Suche
+                if (hideResultsUntilSearch && !predefinedRegion) {
+                    $resultsWrapper.show();
                 }
                 
                 showLoading();
@@ -201,37 +215,36 @@ window.fahrplanportalInit = function(uniqueId) {
             var $textSearch = $container.find('.fahrplanportal-text-search');
             var $resetBtn = $container.find('.fahrplanportal-reset');
             var $autocompleteDropdown = $container.find('.autocomplete-dropdown');
+            var $resultsWrapper = $container.find('.fahrplanportal-results');  // ✅ NEU
             
-            var autocompleteTimeout;
+            var searchTimeout = null;
+            var autocompleteTimeout = null;
             
             $regionFilter.on('change', function() {
-                console.log('🔄 Region geändert:', $(this).val());
-                $textSearch.val(''); // Suchfeld resetieren
-                hideAutocomplete();
+                console.log('📍 Region geändert:', $(this).val());
                 performSearch();
             });
             
             $textSearch.on('input', function() {
-                var searchText = $(this).val().trim();
+                var searchTerm = $(this).val().trim();
                 
-                // ✅ NEU: Bei Texteingabe Region zurücksetzen
-                if (searchText && $regionFilter.val()) {
-                    $regionFilter.val('');
-                    console.log('🔄 Region zurückgesetzt bei Texteingabe');
-                }
+                clearTimeout(autocompleteTimeout);
+                autocompleteTimeout = setTimeout(function() {
+                    performAutocomplete(searchTerm);
+                }, 200);
                 
-                // Autocomplete (bestehender Code)
-                if (searchText.length >= 2) {
-                    performAutocomplete(searchText);
-                } else {
-                    hideAutocomplete();
-                }
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(function() {
+                    if (searchTerm.length >= 2 || searchTerm.length === 0) {
+                        performSearch();
+                    }
+                }, 400);
             });
             
             $textSearch.on('keypress', function(e) {
                 if (e.which === 13) {
-                    e.preventDefault();
-                    clearTimeout($textSearch.data('timeout'));
+                    clearTimeout(searchTimeout);
+                    hideAutocomplete();
                     performSearch();
                 }
             });
@@ -254,7 +267,13 @@ window.fahrplanportalInit = function(uniqueId) {
                 $regionFilter.val('');
                 $textSearch.val('');
                 hideAutocomplete();
-                showEmptyState();
+                
+                // ✅ NEU: Bei Reset - wenn hideResultsUntilSearch aktiv, Container wieder verstecken
+                if (hideResultsUntilSearch && !predefinedRegion) {
+                    $resultsWrapper.hide();
+                } else {
+                    showEmptyState();
+                }
             });
             
             console.log("✅ UI und Events initialisiert");

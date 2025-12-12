@@ -63,7 +63,7 @@
 
 .fahrplanportal-empty-state,
 .fahrplanportal-no-results {
-    display: none;
+    display: block;
     text-align: center;
     padding: 3rem 1rem;
     background: white;

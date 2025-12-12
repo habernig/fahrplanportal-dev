@@ -2,6 +2,9 @@
 /**
  * FahrplanPortal Core Class
  * Hauptinitialisierung und Komponenten-Management
+ * 
+ * ERWEITERT: Settings-Klasse hinzugefuegt
+ * GEFIXT: Settings auch bei AJAX initialisieren fuer AJAX-Handler
  */
 
 // Prevent direct access
@@ -17,6 +20,7 @@ class FahrplanPortal_Core {
     private $database;
     private $parser;
     private $utils;
+    private $settings;
     
     private $pdf_base_path;
     private $pdf_parsing_enabled;
@@ -46,22 +50,22 @@ class FahrplanPortal_Core {
         $this->pdf_base_path = ABSPATH . 'fahrplaene/';
         $this->pdf_parsing_enabled = $this->check_pdf_parser_availability();
         
-        // ✅ ERWEITERT: Frontend ausschließen, Admin-AJAX + Frontend-AJAX erlauben
+        // Frontend ausschliessen, Admin-AJAX + Frontend-AJAX erlauben
         if (!is_admin() && !(defined('DOING_AJAX') && DOING_AJAX)) {
-            return; // Nur Frontend ohne AJAX ausschließen
+            return;
         }
         
         // Komponenten initialisieren
         $this->init_components();
         
-        error_log('✅ FAHRPLANPORTAL: Core initialisiert (Admin + Admin-AJAX Handler - OHNE Frontend)');
+        error_log('FAHRPLANPORTAL: Core initialisiert (Admin + Admin-AJAX Handler - OHNE Frontend)');
     }
     
     /**
      * Komponenten initialisieren
      */
     private function init_components() {
-        // Utils zuerst (wird von anderen benötigt)
+        // Utils zuerst (wird von anderen benoetigt)
         $this->utils = new FahrplanPortal_Utils();
         
         // Database initialisieren
@@ -73,6 +77,10 @@ class FahrplanPortal_Core {
         // AJAX Handler initialisieren
         $this->ajax = new FahrplanPortal_Ajax($this->database, $this->parser, $this->utils, $this->pdf_parsing_enabled);
         
+        // GEFIXT: Settings IMMER initialisieren (Admin UND AJAX)
+        // Damit der AJAX-Handler fuer Speichern funktioniert
+        $this->settings = new FahrplanPortal_Settings();
+        
         // Admin nur bei echtem Admin (kein AJAX)
         if (is_admin() && !(defined('DOING_AJAX') && DOING_AJAX)) {
             $this->admin = new FahrplanPortal_Admin($this->database, $this->utils, $this->pdf_base_path, $this->pdf_parsing_enabled);
@@ -80,27 +88,24 @@ class FahrplanPortal_Core {
     }
     
     /**
-     * PDF-Parser Verfügbarkeit prüfen
+     * PDF-Parser Verfuegbarkeit pruefen
      */
     private function check_pdf_parser_availability() {
-        // Prüfung 1: Funktion existiert
         if (!function_exists('hd_process_pdf_for_words')) {
             error_log('FAHRPLANPORTAL: hd_process_pdf_for_words Funktion nicht gefunden');
             return false;
         }
         
-        // Prüfung 2: Parser-Klasse verfügbar (verschiedene Namespaces probieren)
         if (class_exists('\Smalot\PdfParser\Parser')) {
-            error_log('FAHRPLANPORTAL: Smalot PDF Parser verfügbar (Namespace)');
+            error_log('FAHRPLANPORTAL: Smalot PDF Parser verfuegbar (Namespace)');
             return true;
         }
         
         if (class_exists('Parser')) {
-            error_log('FAHRPLANPORTAL: Parser-Klasse verfügbar (global)');
+            error_log('FAHRPLANPORTAL: Parser-Klasse verfuegbar (global)');
             return true;
         }
         
-        // Prüfung 3: Composer Autoloader
         if (file_exists(ABSPATH . 'vendor/autoload.php')) {
             require_once ABSPATH . 'vendor/autoload.php';
             if (class_exists('\Smalot\PdfParser\Parser')) {
@@ -109,12 +114,12 @@ class FahrplanPortal_Core {
             }
         }
         
-        error_log('FAHRPLANPORTAL: PDF-Parser nicht verfügbar');
+        error_log('FAHRPLANPORTAL: PDF-Parser nicht verfuegbar');
         return false;
     }
     
     /**
-     * Getter für Komponenten
+     * Getter fuer Komponenten
      */
     public function get_database() {
         return $this->database;
@@ -134,6 +139,10 @@ class FahrplanPortal_Core {
     
     public function get_ajax() {
         return $this->ajax;
+    }
+    
+    public function get_settings() {
+        return $this->settings;
     }
     
     public function is_pdf_parsing_enabled() {
