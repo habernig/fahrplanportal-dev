@@ -802,6 +802,9 @@ jQuery(document).ready(function($) {
             $('#scan-skipped').text(chunkingScanState.totalStats.skipped);
             $('#scan-errors').text(chunkingScanState.totalStats.errors);
             
+            // ✅ FIX: Chunk-Counter aktualisieren
+            $('#scan-current-chunk').text((chunkingScanState.currentChunk + 1) + '/' + chunkingScanState.totalChunks);
+            
             // Restzeit berechnen
             var elapsed = (Date.now() - chunkingScanState.startTime) / 1000;
             if (chunkingScanState.totalStats.processed > 0) {
