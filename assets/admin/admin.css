@@ -309,6 +309,15 @@
 }
 
 /* Button Styling */
+
+button#clear-filter {
+    padding: 8px 16px;
+}
+
+button#scan-directory {
+    padding: 4px 8px;
+}
+
 #confirm-db-clear-cancel,
 #confirm-db-clear-proceed {
     border: none;
@@ -1341,8 +1350,7 @@
 
 .fahrplan-modal-header {
     background: linear-gradient(135deg, #0073aa 0%, #005a87 100%);
-    color: white;
-    padding: 20px 25px;
+    padding: 10px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1350,6 +1358,7 @@
 }
 
 .fahrplan-modal-header h2 {
+    color: white;
     margin: 0;
     font-size: 18px;
     font-weight: 600;
@@ -1384,7 +1393,7 @@
 }
 
 .fahrplan-form-group {
-    margin-bottom: 25px;
+    margin-bottom: 10px;
 }
 
 .fahrplan-form-group:last-child {
@@ -1402,7 +1411,7 @@
 .fahrplan-form-group input,
 .fahrplan-form-group textarea {
     width: 100%;
-    padding: 12px 15px;
+    padding: 5px 8px;
     border: 2px solid #ddd;
     border-radius: 6px;
     font-size: 14px;
