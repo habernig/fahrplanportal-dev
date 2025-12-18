@@ -148,6 +148,13 @@ class FahrplanPortal_Admin {
         if (strpos($hook, 'fahrplaene') === false) {
             return;
         }
+
+        // ========================================
+        // ✅ NEU: BOOTSTRAP VOM ASSETS-PLUGIN LADEN
+        // ========================================
+        if (function_exists('load_hd_asset')) {
+            load_hd_asset('bootstrap');
+        }
         
         wp_enqueue_script('jquery');
         
@@ -217,6 +224,15 @@ class FahrplanPortal_Admin {
             'fahrplanportal-admin-scanning',
             $admin_js_path . 'admin-scanning.js',
             array('jquery', 'fahrplanportal-admin-core'),
+            $version,
+            true
+        );
+
+        // 8. Inline-Date-Editor Modul (Bootstrap Inline-Bearbeitung für Datumsspalten)
+        wp_enqueue_script(
+            'fahrplanportal-admin-inline-date',
+            $admin_js_path . 'admin-inline-date.js',
+            array('jquery', 'fahrplanportal-admin-core', 'fahrplanportal-admin-datatable'),
             $version,
             true
         );
@@ -1295,9 +1311,9 @@ ST3:STADT3
                     <td>%d</td>
                     <td>%s</td>
                     <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
-                    <td>%s</td>
+                    <td class="editable-text editable-titel">%s</td>
+                    <td class="editable-date col-gueltig-von">%s</td>
+                    <td class="editable-date col-gueltig-bis">%s</td>
                     <td id="status-%d">%s</td>
                     <td>%s</td>
                     <td>%s</td>

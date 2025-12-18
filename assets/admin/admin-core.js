@@ -399,47 +399,6 @@ jQuery(document).ready(function($) {
         
         FahrplanAdmin.initialized = true;
         
-        // ✅ CSS für Editierbarkeit hinzufügen
-        $('<style>')
-            .prop('type', 'text/css')
-            .html(`
-                /* Linie NEU editierbar - Hover-Effekt */
-                #fahrplaene-table tbody td:nth-child(3) {
-                    cursor: pointer !important;
-                    transition: background-color 0.2s ease;
-                }
-                
-                #fahrplaene-table tbody td:nth-child(3):hover {
-                    background-color: #e3f2fd !important;
-                    color: #1565c0 !important;
-                }
-                
-                /* Linie ALT nicht editierbar - normaler Stil */
-                #fahrplaene-table tbody td:nth-child(2) {
-                    cursor: default !important;
-                    color: #666 !important;
-                }
-                
-                #fahrplaene-table tbody td:nth-child(2):hover {
-                    background-color: inherit !important;
-                    color: #666 !important;
-                }
-
-                #pending-imports-container {
-                    clear: both;
-                    width: 100%;
-                }
-                
-                .import-success-item {
-                    animation: fadeToGreen 0.5s ease-in-out;
-                }
-                
-                @keyframes fadeToGreen {
-                    from { background: #fff3cd; }
-                    to { background: #d4edda; }
-                }
-            `)
-            .appendTo('head');
         
         // Event auslösen damit andere Module starten können
         $(document).trigger('fahrplanAdmin:ready');

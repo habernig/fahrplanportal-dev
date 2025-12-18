@@ -1012,15 +1012,13 @@ button#scan-directory {
     cursor: pointer !important;
     transition: all 0.2s ease !important;
     position: relative;
-    color: #2271b1 !important;
+    color: #138496 !important;
 }
 
 #fahrplaene-table td:nth-child(3):hover {
-    background-color: #e3f2fd !important;
-    color: #1565c0 !important;
-    transform: scale(1.05) !important;
-    border-radius: 4px !important;
-    box-shadow: 0 2px 8px rgba(21, 101, 192, 0.2) !important;
+    color:#f5f5f5 !important;
+    border-radius: 2px !important;
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important;
 }
 
 #fahrplaene-table td:nth-child(3):active {
@@ -1030,6 +1028,7 @@ button#scan-directory {
 
 /* Tooltip für Linie NEU */
 #fahrplaene-table td:nth-child(3):after {
+    display:none !important;
     content: "Klicken zum Bearbeiten";
     position: absolute;
     bottom: -25px;
@@ -1985,4 +1984,186 @@ button#scan-directory {
     font-size: 13px;
     margin: 10px 0 0 0;
     line-height: 1.4;
+}
+
+
+
+
+/* ========================================
+   ✅ BOOTSTRAP: INLINE-DATUM-EDITOR
+   ======================================== */
+
+/* Datumsspalten klickbar machen */
+#fahrplaene-table td.editable-date {
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+    color: var(--wp-admin-theme-color, #2271b1) !important;
+    color:#138496 !important;
+}
+
+/* Hover-Effekt für Datumsspalten */
+#fahrplaene-table td.editable-date:not(.editing):hover {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important;
+    border-radius: 2px;
+    color:#f5f5f5 !important;
+}
+
+/* Hover-Indicator (Stift-Icon) */
+#fahrplaene-table td.editable-date:not(.editing):hover::after {
+    content: "✎";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #0073aa;
+    font-size: 16px;
+    opacity: 0.7;
+    animation: fadeInIcon 0.2s ease;
+}
+
+/* Edit-Modus aktiv (Zelle wird bearbeitet) */
+#fahrplaene-table td.editing {
+    background: #fff !important;
+    padding: 4px !important;
+    vertical-align: middle !important;
+}
+
+/* Bootstrap Input-Group Container */
+.inline-date-group {
+    width: 100%;
+    min-width: 220px;
+    display: flex !important;
+    align-items: stretch;
+}
+
+/* Datum-Input-Feld */
+.inline-date-input {
+    font-size: 13px !important;
+    border: 2px solid #0073aa !important;
+    border-radius: 4px 0 0 4px !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 115, 170, 0.15) !important;
+    padding: 4px 8px !important;
+    height: auto !important;
+}
+
+.inline-date-input:focus {
+    border-color: #005a87 !important;
+    box-shadow: 0 0 0 0.3rem rgba(0, 115, 170, 0.25) !important;
+    outline: none !important;
+}
+
+/* Buttons im Input-Group */
+.inline-date-group .btn {
+    padding: 4px 10px !important;
+    border: 2px solid transparent !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 36px;
+    transition: all 0.2s ease;
+}
+
+/* Speichern-Button (Grün) */
+.inline-date-group .save-date {
+    background: linear-gradient(135deg, #00a32a 0%, #008a20 100%) !important;
+    border-color: #00a32a !important;
+    color: white !important;
+}
+
+.inline-date-group .save-date:hover {
+    background: linear-gradient(135deg, #008a20 0%, #007017 100%) !important;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 163, 42, 0.3);
+}
+
+.inline-date-group .save-date:active {
+    transform: scale(0.98);
+}
+
+/* Abbrechen-Button (Grau) */
+.inline-date-group .cancel-date {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%) !important;
+    border-color: #6c757d !important;
+    border-radius: 0 4px 4px 0 !important;
+    color: white !important;
+}
+
+.inline-date-group .cancel-date:hover {
+    background: linear-gradient(135deg, #5a6268 0%, #495057 100%) !important;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+}
+
+.inline-date-group .cancel-date:active {
+    transform: scale(0.98);
+}
+
+/* Dashicons in Buttons */
+.inline-date-group .dashicons {
+    font-size: 16px !important;
+    width: 16px !important;
+    height: 16px !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    vertical-align: middle;
+}
+
+/* Loading-State Container */
+#fahrplaene-table td.editing .d-flex {
+    min-height: 32px;
+    padding: 4px;
+}
+
+/* Bootstrap Spinner Größe anpassen */
+#fahrplaene-table td.editing .spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+}
+
+/* Success/Error Badges nach dem Speichern */
+#fahrplaene-table td .badge {
+    font-size: 11px;
+    padding: 3px 6px;
+    font-weight: 600;
+    animation: popIn 0.3s ease;
+}
+
+/* Animationen */
+@keyframes fadeInIcon {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) scale(0.8);
+    }
+    to {
+        opacity: 0.7;
+        transform: translateY(-50%) scale(1);
+    }
+}
+
+@keyframes popIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Responsive: Kleinere Bildschirme */
+@media (max-width: 1200px) {
+    .inline-date-group {
+        min-width: 200px;
+    }
+    
+    .inline-date-group .btn {
+        min-width: 32px;
+        padding: 4px 8px !important;
+    }
 }
