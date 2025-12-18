@@ -24,7 +24,7 @@ class FahrplanPortal_Admin {
         
         $this->init_hooks();
     }
-    
+
     /**
      * Admin-Hooks initialisieren
      */
@@ -37,6 +37,17 @@ class FahrplanPortal_Admin {
      * Admin-Menü hinzufügen
      */
     public function add_admin_menu() {
+        // SVG-Icon laden und als Base64 kodieren
+        $icon_path = plugin_dir_path(__FILE__) . '../assets/kl-icon-menu.svg';
+        
+        if (file_exists($icon_path)) {
+            $svg_content = file_get_contents($icon_path);
+            $icon = 'data:image/svg+xml;base64,' . base64_encode($svg_content);
+        } else {
+            // Fallback auf Dashicon, falls SVG nicht gefunden
+            $icon = 'dashicons-calendar-alt';
+        }
+        
         // Hauptseite "Fahrpläne" erstellen
         add_menu_page(
             'Fahrpläne',
@@ -44,7 +55,7 @@ class FahrplanPortal_Admin {
             'edit_posts',
             'fahrplaene',
             array($this, 'admin_page'),
-            'dashicons-calendar-alt',
+            $icon,  // SVG statt Dashicon
             30
         );
         
@@ -68,7 +79,6 @@ class FahrplanPortal_Admin {
             array($this, 'db_maintenance_page')
         );
     }
-
 
     /**
      * ✅ NEU: Plugin-Version und Branch aus Root-Plugin-File auslesen
@@ -120,12 +130,15 @@ class FahrplanPortal_Admin {
         
         return $badge;
     }
-    
 
     /**
-     * Admin-Scripts laden - ✅ GEFIXT: Nur im relevanten Admin-Bereich
+     * ✅ NEU: Einheitlicher Page-Header für alle Fahrplanportal-Seiten
+     * 
+     * @param string $title Seitentitel
      */
-
+    private function render_page_header($title) {
+        FahrplanPortal_UI_Helper::render_page_header($title);
+    }
     
     /**
      * Admin-Scripts laden - ✅ MODULAR: 7 separate JS-Module
@@ -245,6 +258,23 @@ class FahrplanPortal_Admin {
             $version
         );
         
+        // ✅ Custom CSS für farbiges Menü-Icon (höhere Priorität)
+        wp_add_inline_style('fahrplanportal-admin', '
+            /* Normaler Zustand - Farbe erhalten */
+            #adminmenu li#toplevel_page_fahrplaene .wp-menu-image img {
+                filter: none !important;
+                opacity: 1 !important;
+            }
+            
+            /* Hover & Active - Weiß färben */
+            #adminmenu li#toplevel_page_fahrplaene:hover .wp-menu-image img,
+            #adminmenu li#toplevel_page_fahrplaene.wp-has-current-submenu .wp-menu-image img,
+            #adminmenu li#toplevel_page_fahrplaene.current .wp-menu-image img {
+                filter: brightness(0) invert(1) !important;
+                opacity: 1 !important;
+            }
+        ');
+        
         error_log('✅ FAHRPLANPORTAL: Admin-Scripts (modular) geladen für: ' . $hook);
     }
     
@@ -255,7 +285,7 @@ class FahrplanPortal_Admin {
         $available_folders = $this->get_available_folders();
         ?>
         <div class="wrap">
-            <h1>Fahrplanportal Verwaltung <?php echo $this->get_plugin_version_badge(); ?></h1>
+            <?php FahrplanPortal_UI_Helper::render_page_header('Verwaltung Fahrpläne'); ?>
             
             <?php if (!$this->pdf_parsing_enabled): ?>
                 <div class="notice notice-warning">
@@ -289,10 +319,10 @@ class FahrplanPortal_Admin {
                     </p>
                 <?php else: ?>
                     <p class="description">
-                        <strong>Gefundene Ordner:</strong> <?php echo implode(', ', $available_folders); ?>
-                        <br><strong>Struktur:</strong> <code>fahrplaene/[Ordner]/[Region]/fahrplan.pdf</code>
-                        <br><strong>Beispiel:</strong> <code>fahrplaene/2026/villach-land/561-feldkirchen-unterberg.pdf</code>
-                        <br><strong>⚠️ Gültigkeit:</strong> Ordner <code>[2026]</code> = Fahrpläne gültig vom <strong>14.12.[2025] bis 13.12.[2026]</strong>
+                        <?php /* ?>
+                           <strong>Gefundene Ordner:</strong> <?php echo implode(', ', $available_folders); ?><br>
+                        <?php */ ?>
+                        <strong>⚠️ Gültigkeit:</strong> Ordner <code>[2026]</code> = Fahrpläne gültig vom <strong>14.12.[2025] bis 13.12.[2026]</strong>
                         <?php if ($this->pdf_parsing_enabled): ?>
                             <br><strong>PDF-Parsing:</strong> Aktiviert - Inhalte werden automatisch geparst und als Tags gespeichert!
                         <?php else: ?>
@@ -573,7 +603,7 @@ class FahrplanPortal_Admin {
         $can_edit = current_user_can('edit_posts');
         ?>
         <div class="wrap">
-            <h1>Datenbank Wartung</h1>
+            <?php FahrplanPortal_UI_Helper::render_page_header('Datenbank Wartung'); ?>
             
             <!-- ✅ LINIEN-MAPPING SEKTION - FÜR ALLE BENUTZER MIT edit_posts -->
             <?php if ($can_edit): ?>

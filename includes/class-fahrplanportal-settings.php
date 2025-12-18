@@ -96,11 +96,7 @@ class FahrplanPortal_Settings {
         $settings = $this->get_settings();
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">
-                <span class="dashicons dashicons-admin-settings" style="vertical-align: middle; margin-right: 10px;"></span>
-                FahrplanPortal Einstellungen
-                <?php echo $this->get_plugin_version_badge(); ?>
-            </h1>
+            <?php FahrplanPortal_UI_Helper::render_page_header('Einstellungen'); ?>
             
             <hr class="wp-header-end">
             

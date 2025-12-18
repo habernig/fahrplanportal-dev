@@ -508,7 +508,8 @@ public function render_stats_page() {
     $quick_stats = $this->get_quick_stats();
     ?>
     <div class="wrap">
-        <h1>Fahrplan Such-Statistiken</h1>
+     
+        <?php FahrplanPortal_UI_Helper::render_page_header('Fahrplan Such-Statistiken'); ?>
         
         <!-- Bootstrap Alert wenn Logging deaktiviert -->
         <?php if (!$this->is_enabled): ?>
@@ -1230,7 +1231,7 @@ public function render_stats_page() {
         $blacklist = get_option('fahrplanportal_search_blacklist', '');
         ?>
         <div class="wrap">
-            <h1>Such-Einstellungen</h1>
+            <?php FahrplanPortal_UI_Helper::render_page_header('Fahrplan Such-Einstellungen'); ?>
             
             <form method="post" action="">
                 <?php wp_nonce_field('fahrplanportal_search_settings'); ?>
@@ -1420,7 +1421,7 @@ public function render_stats_page() {
     public function render_export_page() {
         ?>
         <div class="wrap">
-            <h1>Such-Daten Export</h1>
+            <?php FahrplanPortal_UI_Helper::render_page_header('Fahrplan Such-Daten Export'); ?>
             
             <div class="card">
                 <div class="card-header">
